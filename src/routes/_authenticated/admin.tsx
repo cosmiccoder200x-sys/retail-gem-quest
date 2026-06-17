@@ -188,49 +188,6 @@ function AdminOrders() {
     },
   });
   const update = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("orders").update({ status: status as "pending" | "confirmed" | "shipped" | "delivered" | "cancelled" }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Updated");
-      qc.invalidateQueries({ queryKey: ["admin-orders"] });
-    },
-  });
-
-  return (
-    <div className="mt-6 rounded-3xl bg-white ring-1 ring-brand/5">
-      {(orders ?? []).map((o) => (
-        <div key={o.id} className="flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0">
-          <span className="font-mono text-xs">#{o.id.slice(0, 8)}</span>
-          <span className="text-sm text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</span>
-          <span className="font-display italic">{formatINR(Number(o.total))}</span>
-          <Select value={o.status ?? "pending"} onValueChange={(v) => update.mutate({ id: o.id, status: v })}>
-            <SelectTrigger className="w-40 ml-auto"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
-              <SelectItem value="shipped">Shipped</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AdminOrders() {
-  const qc = useQueryClient();
-  const { data: orders } = useQuery({
-    queryKey: ["admin-orders"],
-    queryFn: async () => {
-      const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
-      return data ?? [];
-    },
-  });
-  const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
       const { error } = await supabase.from("orders").update(patch).eq("id", id);
       if (error) throw error;
