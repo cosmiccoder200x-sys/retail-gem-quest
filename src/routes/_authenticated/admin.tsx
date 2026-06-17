@@ -213,3 +213,157 @@ function AdminOrders() {
     </div>
   );
 }
+
+type SupplierDraft = {
+  name: string;
+  platform: string;
+  contact_email: string;
+  contact_phone: string;
+  website: string;
+  api_key_ref: string;
+  notes: string;
+  is_active: boolean;
+};
+
+const EMPTY_SUPPLIER: SupplierDraft = {
+  name: "",
+  platform: "manual",
+  contact_email: "",
+  contact_phone: "",
+  website: "",
+  api_key_ref: "",
+  notes: "",
+  is_active: true,
+};
+
+function AdminSuppliers() {
+  const qc = useQueryClient();
+  const { data: suppliers } = useQuery({
+    queryKey: ["admin-suppliers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("suppliers").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<SupplierDraft>(EMPTY_SUPPLIER);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!draft.name.trim()) throw new Error("Name is required");
+      const payload = {
+        name: draft.name.trim(),
+        platform: draft.platform.trim() || "manual",
+        contact_email: draft.contact_email.trim() || null,
+        contact_phone: draft.contact_phone.trim() || null,
+        website: draft.website.trim() || null,
+        api_key_ref: draft.api_key_ref.trim() || null,
+        notes: draft.notes.trim() || null,
+        is_active: draft.is_active,
+      };
+      if (editing === "new") {
+        const { error } = await supabase.from("suppliers").insert(payload);
+        if (error) throw error;
+      } else if (editing) {
+        const { error } = await supabase.from("suppliers").update(payload).eq("id", editing);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Saved");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["admin-suppliers"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase.from("suppliers").update({ is_active }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Updated");
+      qc.invalidateQueries({ queryKey: ["admin-suppliers"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-6 space-y-4">
+      <Button
+        onClick={() => { setEditing("new"); setDraft(EMPTY_SUPPLIER); }}
+        className="rounded-full"
+      >+ New Supplier</Button>
+
+      {editing && (
+        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-brand/5">
+          <h3 className="font-display text-xl uppercase">{editing === "new" ? "Add Supplier" : "Edit Supplier"}</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label>Name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
+            <div>
+              <Label>Platform</Label>
+              <Select value={draft.platform} onValueChange={(v) => setDraft({ ...draft, platform: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="cj">CJ Dropshipping</SelectItem>
+                  <SelectItem value="aliexpress">AliExpress</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>Contact email</Label><Input type="email" value={draft.contact_email} onChange={(e) => setDraft({ ...draft, contact_email: e.target.value })} /></div>
+            <div><Label>Contact phone</Label><Input value={draft.contact_phone} onChange={(e) => setDraft({ ...draft, contact_phone: e.target.value })} /></div>
+            <div className="sm:col-span-2"><Label>Website</Label><Input placeholder="https://" value={draft.website} onChange={(e) => setDraft({ ...draft, website: e.target.value })} /></div>
+            <div className="sm:col-span-2">
+              <Label>API key reference</Label>
+              <Input placeholder="e.g. CJ_API_KEY (secret name, not the value)" value={draft.api_key_ref} onChange={(e) => setDraft({ ...draft, api_key_ref: e.target.value })} />
+              <p className="mt-1 text-xs text-muted-foreground">Store the secret name only. The actual key lives in backend secrets.</p>
+            </div>
+          </div>
+          <div><Label>Notes</Label><Textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></div>
+          <div className="flex items-center gap-2">
+            <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
+            <Label>Active</Label>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-3xl bg-white ring-1 ring-brand/5">
+        {(suppliers ?? []).length === 0 && (
+          <p className="p-6 text-sm text-muted-foreground">No suppliers yet.</p>
+        )}
+        {(suppliers ?? []).map((s) => (
+          <div key={s.id} className="flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0">
+            <div className="min-w-0 flex-1">
+              <p className="font-bold">{s.name} {!s.is_active && <span className="ml-2 text-xs uppercase text-muted-foreground">(inactive)</span>}</p>
+              <p className="text-xs text-muted-foreground">{s.platform}{s.contact_email ? ` · ${s.contact_email}` : ""}{s.website ? ` · ${s.website}` : ""}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: s.id, is_active: v })} />
+              <Button size="sm" variant="outline" onClick={() => {
+                setEditing(s.id);
+                setDraft({
+                  name: s.name,
+                  platform: s.platform ?? "manual",
+                  contact_email: s.contact_email ?? "",
+                  contact_phone: s.contact_phone ?? "",
+                  website: s.website ?? "",
+                  api_key_ref: s.api_key_ref ?? "",
+                  notes: s.notes ?? "",
+                  is_active: s.is_active,
+                });
+              }}>Edit</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
