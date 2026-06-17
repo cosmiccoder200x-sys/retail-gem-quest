@@ -189,7 +189,7 @@ function AdminOrders() {
   });
   const update = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
-      const { error } = await supabase.from("orders").update(patch).eq("id", id);
+      const { error } = await supabase.from("orders").update(patch as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -415,7 +415,7 @@ function VariantsEditor({ productId }: { productId: string }) {
 
   const updateField = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
-      const { error } = await supabase.from("product_variants").update(patch).eq("id", id);
+      const { error } = await supabase.from("product_variants").update(patch as never).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-variants", productId] }),
