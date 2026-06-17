@@ -63,6 +63,7 @@ export type Database = {
           product_id: string
           quantity: number
           user_id: string
+          variant_id: string | null
         }
         Insert: {
           created_at?: string
@@ -70,6 +71,7 @@ export type Database = {
           product_id: string
           quantity?: number
           user_id: string
+          variant_id?: string | null
         }
         Update: {
           created_at?: string
@@ -77,6 +79,7 @@ export type Database = {
           product_id?: string
           quantity?: number
           user_id?: string
+          variant_id?: string | null
         }
         Relationships: [
           {
@@ -84,6 +87,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -115,6 +125,45 @@ export type Database = {
         }
         Relationships: []
       }
+      coupons: {
+        Row: {
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          min_order_total: number | null
+          used_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_type: string
+          discount_value: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_total?: number | null
+          used_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          min_order_total?: number | null
+          used_count?: number
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           id: string
@@ -124,6 +173,8 @@ export type Database = {
           product_image: string | null
           product_name: string
           quantity: number
+          variant_id: string | null
+          variant_label: string | null
         }
         Insert: {
           id?: string
@@ -133,6 +184,8 @@ export type Database = {
           product_image?: string | null
           product_name: string
           quantity: number
+          variant_id?: string | null
+          variant_label?: string | null
         }
         Update: {
           id?: string
@@ -142,6 +195,8 @@ export type Database = {
           product_image?: string | null
           product_name?: string
           quantity?: number
+          variant_id?: string | null
+          variant_label?: string | null
         }
         Relationships: [
           {
@@ -158,11 +213,21 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
+            referencedColumns: ["id"]
+          },
         ]
       }
       orders: {
         Row: {
           created_at: string
+          customer_email: string | null
+          forwarded_at: string | null
+          forwarding_status: string
           id: string
           notes: string | null
           payment_method: string
@@ -170,12 +235,20 @@ export type Database = {
           shipping_address: Json
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          supplier_id: string | null
+          supplier_order_id: string | null
           total: number
+          tracking_carrier: string | null
+          tracking_number: string | null
+          tracking_url: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          customer_email?: string | null
+          forwarded_at?: string | null
+          forwarding_status?: string
           id?: string
           notes?: string | null
           payment_method?: string
@@ -183,12 +256,20 @@ export type Database = {
           shipping_address: Json
           status?: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          supplier_id?: string | null
+          supplier_order_id?: string | null
           total: number
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          customer_email?: string | null
+          forwarded_at?: string | null
+          forwarding_status?: string
           id?: string
           notes?: string | null
           payment_method?: string
@@ -196,16 +277,95 @@ export type Database = {
           shipping_address?: Json
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          supplier_id?: string | null
+          supplier_order_id?: string | null
           total?: number
+          tracking_carrier?: string | null
+          tracking_number?: string | null
+          tracking_url?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_variants: {
+        Row: {
+          cost_price: number | null
+          created_at: string
+          id: string
+          image_url: string | null
+          option1_name: string | null
+          option1_value: string | null
+          option2_name: string | null
+          option2_value: string | null
+          option3_name: string | null
+          option3_value: string | null
+          price: number | null
+          product_id: string
+          sku: string | null
+          stock: number
+          supplier_sku: string | null
+          updated_at: string
+        }
+        Insert: {
+          cost_price?: number | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          option1_name?: string | null
+          option1_value?: string | null
+          option2_name?: string | null
+          option2_value?: string | null
+          option3_name?: string | null
+          option3_value?: string | null
+          price?: number | null
+          product_id: string
+          sku?: string | null
+          stock?: number
+          supplier_sku?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cost_price?: number | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          option1_name?: string | null
+          option1_value?: string | null
+          option2_name?: string | null
+          option2_value?: string | null
+          option3_name?: string | null
+          option3_value?: string | null
+          price?: number | null
+          product_id?: string
+          sku?: string | null
+          stock?: number
+          supplier_sku?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
           badge: string | null
           category_id: string | null
+          cost_price: number | null
           created_at: string
           description: string | null
           id: string
@@ -218,15 +378,21 @@ export type Database = {
           price: number
           rating: number
           review_count: number
+          shipping_days_max: number | null
+          shipping_days_min: number | null
           short_description: string | null
           slug: string
           specs: Json
           stock: number
+          supplier_id: string | null
+          supplier_sku: string | null
+          supplier_url: string | null
           updated_at: string
         }
         Insert: {
           badge?: string | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -239,15 +405,21 @@ export type Database = {
           price: number
           rating?: number
           review_count?: number
+          shipping_days_max?: number | null
+          shipping_days_min?: number | null
           short_description?: string | null
           slug: string
           specs?: Json
           stock?: number
+          supplier_id?: string | null
+          supplier_sku?: string | null
+          supplier_url?: string | null
           updated_at?: string
         }
         Update: {
           badge?: string | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           description?: string | null
           id?: string
@@ -260,10 +432,15 @@ export type Database = {
           price?: number
           rating?: number
           review_count?: number
+          shipping_days_max?: number | null
+          shipping_days_min?: number | null
           short_description?: string | null
           slug?: string
           specs?: Json
           stock?: number
+          supplier_id?: string | null
+          supplier_sku?: string | null
+          supplier_url?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -272,6 +449,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -297,6 +481,48 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      suppliers: {
+        Row: {
+          api_key_ref: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          platform: string
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          api_key_ref?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          platform?: string
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          api_key_ref?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          platform?: string
+          updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -327,18 +553,21 @@ export type Database = {
           id: string
           product_id: string
           user_id: string
+          variant_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           product_id: string
           user_id: string
+          variant_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           product_id?: string
           user_id?: string
+          variant_id?: string | null
         }
         Relationships: [
           {
@@ -346,6 +575,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "product_variants"
             referencedColumns: ["id"]
           },
         ]
@@ -361,6 +597,19 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      lookup_order: {
+        Args: { _email: string; _order_id: string }
+        Returns: {
+          created_at: string
+          forwarding_status: string
+          id: string
+          status: string
+          total: number
+          tracking_carrier: string
+          tracking_number: string
+          tracking_url: string
+        }[]
       }
     }
     Enums: {
