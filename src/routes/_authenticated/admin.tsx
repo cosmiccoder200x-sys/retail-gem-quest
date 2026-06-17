@@ -221,6 +221,281 @@ function AdminOrders() {
   );
 }
 
+function AdminOrders() {
+  const qc = useQueryClient();
+  const { data: orders } = useQuery({
+    queryKey: ["admin-orders"],
+    queryFn: async () => {
+      const { data } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+  const update = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
+      const { error } = await supabase.from("orders").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Updated");
+      qc.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-6 space-y-3">
+      {(orders ?? []).map((o) => (
+        <OrderRow key={o.id} order={o} onSave={(patch) => update.mutate({ id: o.id, patch })} />
+      ))}
+    </div>
+  );
+}
+
+function OrderRow({ order, onSave }: { order: Record<string, any>; onSave: (patch: Record<string, unknown>) => void }) {
+  const [carrier, setCarrier] = useState(order.tracking_carrier ?? "");
+  const [number, setNumber] = useState(order.tracking_number ?? "");
+  const [url, setUrl] = useState(order.tracking_url ?? "");
+  return (
+    <div className="rounded-3xl bg-white p-4 ring-1 ring-brand/5">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-mono text-xs">#{order.id.slice(0, 8)}</span>
+        <span className="text-sm text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</span>
+        <span className="font-display italic">{formatINR(Number(order.total))}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <Select value={order.status ?? "pending"} onValueChange={(v) => onSave({ status: v })}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="shipped">Shipped</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={order.forwarding_status ?? "pending"} onValueChange={(v) => onSave({ forwarding_status: v })}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Forwarding" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="pending">Fwd: Pending</SelectItem>
+              <SelectItem value="forwarded">Fwd: Forwarded</SelectItem>
+              <SelectItem value="failed">Fwd: Failed</SelectItem>
+              <SelectItem value="manual">Fwd: Manual</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <Input placeholder="Carrier" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
+        <Input placeholder="Tracking #" value={number} onChange={(e) => setNumber(e.target.value)} />
+        <Input placeholder="Tracking URL" value={url} onChange={(e) => setUrl(e.target.value)} className="sm:col-span-2" />
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button size="sm" variant="outline" onClick={() => onSave({ tracking_carrier: carrier || null, tracking_number: number || null, tracking_url: url || null })}>Save tracking</Button>
+      </div>
+    </div>
+  );
+}
+
+function CsvImporter({ onDone }: { onDone: () => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFile = async (file: File) => {
+    setBusy(true);
+    try {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length === 0) throw new Error("Empty CSV");
+      let pCount = 0, vCount = 0;
+      const productCache = new Map<string, string>();
+      for (const r of rows) {
+        const slug = (r.slug || "").trim();
+        if (!slug) continue;
+        let productId = productCache.get(slug);
+        if (!productId) {
+          const productPayload = {
+            name: r.name || slug,
+            slug,
+            price: Number(r.price) || 0,
+            mrp: r.mrp ? Number(r.mrp) : null,
+            stock: r.stock ? Number(r.stock) : 0,
+            short_description: r.short_description || null,
+            description: r.description || null,
+            image_url: r.image_url || null,
+            supplier_sku: r.supplier_sku || null,
+            cost_price: r.cost_price ? Number(r.cost_price) : null,
+          };
+          const { data: up, error } = await supabase
+            .from("products")
+            .upsert(productPayload, { onConflict: "slug" })
+            .select("id")
+            .single();
+          if (error) throw error;
+          productId = up!.id;
+          productCache.set(slug, productId);
+          pCount++;
+        }
+        if (r.variant_sku || r.variant_option1_value) {
+          const { error: vErr } = await supabase.from("product_variants").insert({
+            product_id: productId,
+            sku: r.variant_sku || null,
+            price: r.variant_price ? Number(r.variant_price) : null,
+            stock: r.variant_stock ? Number(r.variant_stock) : 0,
+            option1_name: r.variant_option1_name || null,
+            option1_value: r.variant_option1_value || null,
+            option2_name: r.variant_option2_name || null,
+            option2_value: r.variant_option2_value || null,
+            supplier_sku: r.variant_supplier_sku || null,
+          });
+          if (vErr) throw vErr;
+          vCount++;
+        }
+      }
+      toast.success(`Imported ${pCount} products, ${vCount} variants`);
+      onDone();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault(); setDragOver(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) handleFile(f);
+      }}
+      className={`flex flex-1 items-center justify-between gap-3 rounded-full border-2 border-dashed px-4 py-2 text-sm ${dragOver ? "border-primary bg-primary/5" : "border-border"}`}
+    >
+      <span className="text-muted-foreground">
+        {busy ? "Importing…" : "Drag-drop CSV to import (columns: slug, name, price, mrp, stock, short_description, description, image_url, supplier_sku, cost_price, variant_sku, variant_price, variant_stock, variant_option1_name, variant_option1_value, variant_option2_name, variant_option2_value, variant_supplier_sku)"}
+      </span>
+      <Button size="sm" variant="outline" disabled={busy} onClick={() => inputRef.current?.click()}>Choose CSV</Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+      />
+    </div>
+  );
+}
+
+function parseCsv(text: string): Record<string, string>[] {
+  const lines: string[][] = [];
+  let cur: string[] = [];
+  let field = "";
+  let inQ = false;
+  const s = text.replace(/\r\n?/g, "\n");
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inQ) {
+      if (c === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; } else { inQ = false; }
+      } else field += c;
+    } else {
+      if (c === '"') inQ = true;
+      else if (c === ",") { cur.push(field); field = ""; }
+      else if (c === "\n") { cur.push(field); lines.push(cur); cur = []; field = ""; }
+      else field += c;
+    }
+  }
+  if (field.length || cur.length) { cur.push(field); lines.push(cur); }
+  const headers = (lines.shift() ?? []).map((h) => h.trim());
+  return lines
+    .filter((r) => r.some((c) => c.trim() !== ""))
+    .map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").trim()])));
+}
+
+function VariantsEditor({ productId }: { productId: string }) {
+  const qc = useQueryClient();
+  const { data: variants } = useQuery({
+    queryKey: ["admin-variants", productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("product_variants").select("*").eq("product_id", productId).order("created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const [draft, setDraft] = useState({ sku: "", option1_name: "Size", option1_value: "", option2_name: "", option2_value: "", price: 0, stock: 0, supplier_sku: "" });
+
+  const add = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("product_variants").insert({
+        product_id: productId,
+        sku: draft.sku || null,
+        option1_name: draft.option1_name || null,
+        option1_value: draft.option1_value || null,
+        option2_name: draft.option2_name || null,
+        option2_value: draft.option2_value || null,
+        price: draft.price || null,
+        stock: draft.stock || 0,
+        supplier_sku: draft.supplier_sku || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Variant added");
+      setDraft({ sku: "", option1_name: "Size", option1_value: "", option2_name: "", option2_value: "", price: 0, stock: 0, supplier_sku: "" });
+      qc.invalidateQueries({ queryKey: ["admin-variants", productId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_variants").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-variants", productId] }),
+  });
+
+  const updateField = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
+      const { error } = await supabase.from("product_variants").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-variants", productId] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-4 rounded-2xl bg-muted/40 p-4">
+      <h4 className="mb-3 font-bold uppercase tracking-wider text-sm">Variants</h4>
+      <div className="space-y-2">
+        {(variants ?? []).map((v) => (
+          <div key={v.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 ring-1 ring-border">
+            <Input className="w-28" placeholder="SKU" defaultValue={v.sku ?? ""} onBlur={(e) => e.target.value !== (v.sku ?? "") && updateField.mutate({ id: v.id, patch: { sku: e.target.value || null } })} />
+            <Input className="w-24" placeholder="Opt1 name" defaultValue={v.option1_name ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option1_name: e.target.value || null } })} />
+            <Input className="w-24" placeholder="Opt1 value" defaultValue={v.option1_value ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option1_value: e.target.value || null } })} />
+            <Input className="w-24" placeholder="Opt2 name" defaultValue={v.option2_name ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option2_name: e.target.value || null } })} />
+            <Input className="w-24" placeholder="Opt2 value" defaultValue={v.option2_value ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option2_value: e.target.value || null } })} />
+            <Input className="w-24" type="number" placeholder="Price" defaultValue={v.price ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { price: e.target.value ? Number(e.target.value) : null } })} />
+            <Input className="w-20" type="number" placeholder="Stock" defaultValue={v.stock} onBlur={(e) => updateField.mutate({ id: v.id, patch: { stock: Number(e.target.value) || 0 } })} />
+            <Button size="sm" variant="ghost" onClick={() => del.mutate(v.id)}>×</Button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-dashed p-3">
+        <div><Label className="text-xs">SKU</Label><Input className="w-28" value={draft.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} /></div>
+        <div><Label className="text-xs">Opt1 name</Label><Input className="w-24" value={draft.option1_name} onChange={(e) => setDraft({ ...draft, option1_name: e.target.value })} /></div>
+        <div><Label className="text-xs">Opt1 value</Label><Input className="w-24" value={draft.option1_value} onChange={(e) => setDraft({ ...draft, option1_value: e.target.value })} /></div>
+        <div><Label className="text-xs">Opt2 name</Label><Input className="w-24" value={draft.option2_name} onChange={(e) => setDraft({ ...draft, option2_name: e.target.value })} /></div>
+        <div><Label className="text-xs">Opt2 value</Label><Input className="w-24" value={draft.option2_value} onChange={(e) => setDraft({ ...draft, option2_value: e.target.value })} /></div>
+        <div><Label className="text-xs">Price</Label><Input className="w-24" type="number" value={draft.price || ""} onChange={(e) => setDraft({ ...draft, price: +e.target.value })} /></div>
+        <div><Label className="text-xs">Stock</Label><Input className="w-20" type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: +e.target.value })} /></div>
+        <Button size="sm" onClick={() => add.mutate()} disabled={add.isPending}>Add variant</Button>
+      </div>
+    </div>
+  );
+}
+
 type SupplierDraft = {
   name: string;
   platform: string;
