@@ -195,7 +195,7 @@ function AdminOrders() {
           <span className="font-mono text-xs">#{o.id.slice(0, 8)}</span>
           <span className="text-sm text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</span>
           <span className="font-display italic">{formatINR(Number(o.total))}</span>
-          <Select value={o.status} onValueChange={(v) => update.mutate({ id: o.id, status: v })}>
+          <Select value={o.status ?? "pending"} onValueChange={(v) => update.mutate({ id: o.id, status: v })}>
             <SelectTrigger className="w-40 ml-auto"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pending">Pending</SelectItem>
