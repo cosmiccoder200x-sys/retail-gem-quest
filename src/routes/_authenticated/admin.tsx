@@ -133,7 +133,10 @@ function AdminProducts() {
 
   return (
     <div className="mt-6 space-y-4">
-      <Button onClick={() => { setEditing("new"); setDraft({ name: "", slug: "", price: 0, mrp: 0, stock: 0, short_description: "", description: "" }); }} className="rounded-full">+ New Product</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => { setEditing("new"); setDraft({ name: "", slug: "", price: 0, mrp: 0, stock: 0, short_description: "", description: "" }); }} className="rounded-full">+ New Product</Button>
+        <CsvImporter onDone={() => qc.invalidateQueries({ queryKey: ["admin-products"] })} />
+      </div>
 
       {editing && (
         <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-brand/5">
@@ -151,6 +154,10 @@ function AdminProducts() {
             <Button onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
             <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
           </div>
+          {editing && editing !== "new" && <VariantsEditor productId={editing} />}
+          {editing === "new" && (
+            <p className="text-xs text-muted-foreground">Save the product first to add variants.</p>
+          )}
         </div>
       )}
 
