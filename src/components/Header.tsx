@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-store";
 import { useCart } from "@/lib/cart";
 import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +41,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-brand/5 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
         <Link to="/" className="font-display text-xl font-extrabold uppercase tracking-tighter text-brand sm:text-2xl">
           GullyGadget
@@ -87,6 +88,7 @@ export function Header() {
         </form>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
+          <ThemeToggle />
           <Link
             to="/cart"
             aria-label="Cart"
