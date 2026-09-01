@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { Eye, EyeOff } from "lucide-react";
 
 const authSearch = z.object({ mode: z.enum(["signin", "signup"]).optional(), redirect: z.string().optional() });
+const signupSchema = z.object({ name: z.string().min(2).max(80), email: z.string().email(), password: z.string().min(6) });
+const signinSchema = z.object({ email: z.string().email(), password: z.string().min(6) });
 
 export const Route = createFileRoute("/auth")({
   validateSearch: authSearch,
@@ -24,12 +27,15 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     try {
       if (tab === "signup") {
+        const parsed = signupSchema.safeParse({ name, email, password });
+        if (!parsed.success) throw new Error(parsed.error.issues[0].message);
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -38,6 +44,8 @@ function AuthPage() {
         if (error) throw error;
         toast.success("Account created!");
       } else {
+        const parsed = signinSchema.safeParse({ email, password });
+        if (!parsed.success) throw new Error(parsed.error.issues[0].message);
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
@@ -78,15 +86,43 @@ function AuthPage() {
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <TabsContent value="signup" className="m-0">
               <Label>Full Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required={tab === "signup"} placeholder="Riya Sharma" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required={tab === "signup"}
+                placeholder="Riya Sharma"
+              />
             </TabsContent>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@email.com" />
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="you@email.com"
+              />
             </div>
             <div>
               <Label>Password</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="pr-12"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-brand"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </div>
             <Button type="submit" disabled={busy} className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
               {busy ? "Please wait…" : tab === "signup" ? "Create Account" : "Sign In"}

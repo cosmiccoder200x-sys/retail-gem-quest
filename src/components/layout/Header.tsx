@@ -1,12 +1,14 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ShoppingBag, Search, User as UserIcon, Heart, Menu } from "lucide-react";
+import { ShoppingBag, Search, User as UserIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-store";
 import { useCart } from "@/lib/cart";
 import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { AnnouncementBar } from "./AnnouncementBar";
+import { MobileMenu } from "./MobileMenu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,27 +44,18 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+      <AnnouncementBar />
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-16">
+        <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl shrink-0">
           Gully<span className="text-brand">Gadget</span>
         </Link>
 
-        <nav className="ml-6 hidden gap-6 text-sm font-medium text-muted-foreground lg:flex">
-          <Link to="/products" search={{ category: "kitchen" }} className="hover:text-brand">
-            Kitchen
-          </Link>
-          <Link to="/products" search={{ category: "home-comfort" }} className="hover:text-brand">
-            Home Comfort
-          </Link>
-          <Link to="/products" search={{ category: "personal-care" }} className="hover:text-brand">
-            Personal Care
-          </Link>
-          <Link to="/products" search={{ category: "cleaning" }} className="hover:text-brand">
-            Cleaning
-          </Link>
-          <Link to="/products" className="font-semibold text-brand">
-            ₹999 Store
-          </Link>
+        <nav className="ml-4 hidden gap-5 text-sm font-medium text-muted-foreground lg:flex" aria-label="Main navigation">
+          <Link to="/products" search={{ category: "kitchen" }} className="hover:text-brand transition-colors">Kitchen</Link>
+          <Link to="/products" search={{ category: "home-comfort" }} className="hover:text-brand transition-colors">Home Comfort</Link>
+          <Link to="/products" search={{ category: "personal-care" }} className="hover:text-brand transition-colors">Personal Care</Link>
+          <Link to="/products" search={{ category: "cleaning" }} className="hover:text-brand transition-colors">Cleaning</Link>
+          <Link to="/products" className="font-semibold text-brand">₹999 Store</Link>
         </nav>
 
         <form onSubmit={submit} className="relative ml-auto hidden flex-1 max-w-xs md:block">
@@ -125,7 +118,7 @@ export function Header() {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/account" hash="wishlist">
-                      <Heart className="mr-2 size-4" /> Wishlist
+                      <span className="mr-2">❤️</span> Wishlist
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -156,9 +149,7 @@ export function Header() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button aria-label="Menu" className="grid size-10 place-items-center rounded-full bg-brand/5 lg:hidden">
-            <Menu className="size-4" />
-          </button>
+          <MobileMenu />
         </div>
       </div>
     </header>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
+import { useState as useState2 } from "react";
 
 export const Route = createFileRoute("/track")({
   head: () => ({
@@ -121,10 +122,22 @@ function TrackPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <Field label="Status" value={result.status} />
-            <Field label="Fulfillment" value={result.forwarding_status ?? "pending"} />
-            <Field label="Carrier" value={result.tracking_carrier ?? "—"} />
-            <Field label="Tracking #" value={result.tracking_number ?? "—"} />
+            <div>
+              <div className="text-xs uppercase text-muted-foreground">Status</div>
+              <div className="font-medium capitalize">{result.status}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase text-muted-foreground">Fulfillment</div>
+              <div className="font-medium capitalize">{result.forwarding_status ?? "pending"}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase text-muted-foreground">Carrier</div>
+              <div className="font-medium">{result.tracking_carrier ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase text-muted-foreground">Tracking #</div>
+              <div className="font-medium">{result.tracking_number ?? "—"}</div>
+            </div>
           </div>
 
           {result.tracking_url && (
@@ -143,15 +156,6 @@ function TrackPage() {
           </p>
         </Card>
       )}
-    </div>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-xs uppercase text-muted-foreground">{label}</div>
-      <div className="font-medium capitalize">{value}</div>
     </div>
   );
 }

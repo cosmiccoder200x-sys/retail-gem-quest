@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-store";
 import { useCart, useRemoveFromCart, useUpdateCartQty } from "@/lib/cart";
-import { ProductTile } from "@/components/ProductTile";
+import { ProductTile } from "@/components/product/ProductTile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { useState } from "react";
+import { EmptyState } from "@/components/common/EmptyState";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Your Cart — GullyGadget" }] }),
@@ -27,7 +28,9 @@ function CartPage() {
       <div className="mx-auto max-w-md px-6 py-20 text-center">
         <h1 className="font-display text-3xl uppercase">Your Cart</h1>
         <p className="mt-4 text-muted-foreground">Sign in to view your cart</p>
-        <Button asChild className="mt-6 rounded-full"><Link to="/auth">Sign in</Link></Button>
+        <Button asChild className="mt-6 rounded-full">
+          <Link to="/auth">Sign in</Link>
+        </Button>
       </div>
     );
   }
@@ -45,8 +48,12 @@ function CartPage() {
   if (!items || items.length === 0) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">
-        <h1 className="font-display text-3xl uppercase">Your Cart is Empty</h1>
-        <Button asChild className="mt-6 rounded-full"><Link to="/products">Continue shopping</Link></Button>
+        <EmptyState
+          icon={<ShoppingCart className="size-10 mb-4" />}
+          title="Your Cart is Waiting"
+          description="Add some gadgets to see your cart total. We've got great deals on smart home, car and everyday gadgets."
+          action={{ label: "Continue Shopping", to: "/products" }}
+        />
       </div>
     );
   }
@@ -68,13 +75,27 @@ function CartPage() {
                 <p className="text-sm text-muted-foreground">{formatINR(it.product.price)} each</p>
                 <div className="mt-auto flex items-center justify-between">
                   <div className="inline-flex items-center rounded-full bg-background ring-1 ring-border">
-                    <button onClick={() => update.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1) })} className="grid size-8 place-items-center"><Minus className="size-3" /></button>
+                    <button
+                      onClick={() => update.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1) })}
+                      className="grid size-8 place-items-center"
+                    >
+                      <Minus className="size-3" />
+                    </button>
                     <span className="w-8 text-center text-sm font-bold">{it.quantity}</span>
-                    <button onClick={() => update.mutate({ id: it.id, quantity: it.quantity + 1 })} className="grid size-8 place-items-center"><Plus className="size-3" /></button>
+                    <button
+                      onClick={() => update.mutate({ id: it.id, quantity: it.quantity + 1 })}
+                      className="grid size-8 place-items-center"
+                    >
+                      <Plus className="size-3" />
+                    </button>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-display text-lg italic">{formatINR(it.product.price * it.quantity)}</span>
-                    <button aria-label="Remove" onClick={() => remove.mutate(it.id)} className="text-muted-foreground hover:text-destructive">
+                    <button
+                      aria-label="Remove"
+                      onClick={() => remove.mutate(it.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
                       <Trash2 className="size-4" />
                     </button>
                   </div>
@@ -87,19 +108,20 @@ function CartPage() {
           <h3 className="font-display text-xl uppercase">Order Summary</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-            {discount > 0 && <div className="flex justify-between text-success"><span>Discount</span><span>− {formatINR(discount)}</span></div>}
+            {discount > 0 && (
+              <div className="flex justify-between text-success">
+                <span>Discount</span>
+                <span>− {formatINR(discount)}</span>
+              </div>
+            )}
             <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
-          </div>
-          <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Coupon Code</p>
-            <div className="flex gap-2">
-              <Input value={coupon} onChange={(e) => setCoupon(e.target.value)} placeholder="GULLY10" />
-              <Button onClick={applyCoupon} variant="outline">Apply</Button>
-            </div>
-            <p className="text-xs text-muted-foreground">Try GULLY10 or NEW50</p>
+            <div className="flex justify-between font-display text-2xl"><span>Total</span><span>{formatINR(total)}</span></div>
           </div>
           <div className="border-t border-border pt-4">
-            <div className="flex justify-between font-display text-2xl"><span>Total</span><span>{formatINR(total)}</span></div>
+            <div className="flex justify-between font-display text-xl">
+              <span>Total</span>
+              <span>{formatINR(total)}</span>
+            </div>
           </div>
           <Button asChild size="lg" className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
             <Link to="/checkout">Checkout</Link>

@@ -1,12 +1,12 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ProductTile } from "@/components/ProductTile";
+import { ProductCard, type ProductCardData } from "@/components/ProductCard";
+import { ProductImageGallery } from "@/components/product/ProductImageGallery";
 import { Button } from "@/components/ui/button";
 import { Heart, ShoppingBag, Star, Truck, ShieldCheck } from "lucide-react";
 import { formatINR, discountPct } from "@/lib/format";
 import { useAddToCart, useToggleWishlist } from "@/lib/cart";
-import { ProductCard, type ProductCardData } from "@/components/ProductCard";
 
 export const Route = createFileRoute("/products/$slug")({
   component: ProductPage,
@@ -18,6 +18,8 @@ export const Route = createFileRoute("/products/$slug")({
     links: [{ rel: "canonical", href: `/products/${params.slug}` }],
   }),
 });
+
+type ProductImage = { url: string; alt?: string };
 
 function ProductPage() {
   const { slug } = Route.useParams();
@@ -38,7 +40,21 @@ function ProductPage() {
     },
   });
 
-  const { data: related } = useQuery({
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-7xl p-8">
+        <ProductCardSkeleton count={3} />
+      </div>
+    );
+  }
+
+  if (!product) return null;
+
+  const off = discountPct(product.price, product.mrp);
+  const images: ProductImage[] = (product.images as any[]) ?? 
+    (product.image_url ? [{ url: product.image_url, alt: product.name }] : []);
+
+  const related = useQuery({
     queryKey: ["related", product?.category_id, product?.id],
     enabled: !!product?.category_id,
     queryFn: async () => {
@@ -48,21 +64,19 @@ function ProductPage() {
         .eq("category_id", product!.category_id!)
         .neq("id", product!.id)
         .limit(3);
-      return (data ?? []) as ProductCardData[];
+      return data ?? [];
     },
   });
 
-  if (isLoading) return <div className="mx-auto max-w-7xl p-12">Loading…</div>;
-  if (!product) return null;
-  const off = discountPct(product.price, product.mrp);
   const specs = (product.specs ?? {}) as Record<string, string>;
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
-      <div className="grid gap-12 lg:grid-cols-2">
-        <div className="aspect-square overflow-hidden rounded-[40px] bg-white shadow-xl shadow-brand/10 ring-1 ring-brand/5">
-          <ProductTile name={product.name} imageUrl={product.image_url} />
-        </div>
+      <div className="grid gap-8 lg:grid-cols-2">
+        <ProductImageGallery
+          images={images}
+          productName={product.name}
+        />
 
         <div className="space-y-5">
           {product.badge && (
@@ -78,6 +92,7 @@ function ProductPage() {
             </div>
             <span className="text-muted-foreground">({product.review_count} reviews)</span>
           </div>
+
           <p className="text-lg text-muted-foreground">{product.short_description}</p>
 
           <div className="flex items-baseline gap-3">
@@ -146,11 +161,14 @@ function ProductPage() {
       </div>
 
       {related && related.length > 0 && (
-        <section className="mt-20">
+        <section className="mt-16">
           <h2 className="mb-8 font-display text-3xl uppercase">Related Products</h2>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {related.map((p) => <ProductCard key={p.id} product={p} />)}
-          </div>
+          <ProductGrid
+            products={related as ProductCardData[]}
+            loading={false}
+            error={false}
+            emptyMessage="No related products"
+          />
         </section>
       )}
     </div>

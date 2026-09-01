@@ -7,7 +7,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/format";
@@ -73,15 +72,10 @@ function AdminDashboard() {
 
   return (
     <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {[
-        { label: "Total Revenue", value: stats ? formatINR(stats.revenue) : "—" },
-        { label: "Orders", value: stats?.orderCount ?? "—" },
-        { label: "Products", value: stats?.productCount ?? "—" },
-        { label: "Low Stock Items", value: stats?.lowStock ?? "—" },
-      ].map((s) => (
-        <div key={s.label} className="rounded-3xl bg-white p-6 ring-1 ring-brand/5">
-          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{s.label}</p>
-          <p className="mt-2 font-display text-3xl">{s.value}</p>
+      {[["Total Revenue", stats?.revenue], ["Orders", stats?.orderCount], ["Products", stats?.productCount], ["Low Stock Items", stats?.lowStock]].map(([label, value]) => (
+        <div key={label} className="rounded-3xl bg-white p-6 ring-1 ring-border">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</p>
+          <p className="mt-2 font-display text-3xl">{value === "—" ? "—" : formatINR(value)}</p>
         </div>
       ))}
     </div>
@@ -98,8 +92,22 @@ function AdminProducts() {
     },
   });
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ name: string; slug: string; price: number; mrp: number; stock: number; short_description: string; description: string }>({
-    name: "", slug: "", price: 0, mrp: 0, stock: 0, short_description: "", description: "",
+  const [draft, setDraft] = useState<{
+    name: string;
+    slug: string;
+    price: number;
+    mrp: number;
+    stock: number;
+    short_description: string;
+    description: string;
+  }>({
+    name: "",
+    slug: "",
+    price: 0,
+    mrp: 0,
+    stock: 0,
+    short_description: "",
+    description: "",
   });
 
   const save = useMutation({
@@ -135,11 +143,11 @@ function AdminProducts() {
     <div className="mt-6 space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={() => { setEditing("new"); setDraft({ name: "", slug: "", price: 0, mrp: 0, stock: 0, short_description: "", description: "" }); }} className="rounded-full">+ New Product</Button>
-        <CsvImporter onDone={() => qc.invalidateQueries({ queryKey: ["admin-products"] })} />
+        <Button variant="ghost" size="sm">Import CSV</Button>
       </div>
 
       {editing && (
-        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-brand/5">
+        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-border">
           <h3 className="font-display text-xl uppercase">{editing === "new" ? "Add Product" : "Edit Product"}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label>Name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
@@ -149,19 +157,15 @@ function AdminProducts() {
             <div><Label>Stock</Label><Input type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: +e.target.value })} /></div>
           </div>
           <div><Label>Short description</Label><Input value={draft.short_description} onChange={(e) => setDraft({ ...draft, short_description: e.target.value })} /></div>
-          <div><Label>Description</Label><Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
+          <div><Label>Description</Label><Input value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></div>
           <div className="flex gap-2">
             <Button onClick={() => save.mutate()} disabled={save.isPending}>Save</Button>
             <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
           </div>
-          {editing && editing !== "new" && <VariantsEditor productId={editing} />}
-          {editing === "new" && (
-            <p className="text-xs text-muted-foreground">Save the product first to add variants.</p>
-          )}
         </div>
       )}
 
-      <div className="rounded-3xl bg-white ring-1 ring-brand/5">
+      <div className="rounded-3xl bg-white ring-1 ring-border">
         {(products ?? []).map((p) => (
           <div key={p.id} className="flex items-center gap-4 border-b border-border p-4 last:border-0">
             <div className="flex-1">
@@ -213,7 +217,7 @@ function OrderRow({ order, onSave }: { order: Record<string, any>; onSave: (patc
   const [number, setNumber] = useState(order.tracking_number ?? "");
   const [url, setUrl] = useState(order.tracking_url ?? "");
   return (
-    <div className="rounded-3xl bg-white p-4 ring-1 ring-brand/5">
+    <div className="rounded-3xl bg-white p-4 ring-1 ring-border">
       <div className="flex flex-wrap items-center gap-3">
         <span className="font-mono text-xs">#{order.id.slice(0, 8)}</span>
         <span className="text-sm text-muted-foreground">{new Date(order.created_at).toLocaleDateString()}</span>
@@ -252,229 +256,6 @@ function OrderRow({ order, onSave }: { order: Record<string, any>; onSave: (patc
   );
 }
 
-function CsvImporter({ onDone }: { onDone: () => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleFile = async (file: File) => {
-    setBusy(true);
-    try {
-      const text = await file.text();
-      const rows = parseCsv(text);
-      if (rows.length === 0) throw new Error("Empty CSV");
-      let pCount = 0, vCount = 0;
-      const productCache = new Map<string, string>();
-      for (const r of rows) {
-        const slug = (r.slug || "").trim();
-        if (!slug) continue;
-        let productId = productCache.get(slug);
-        if (!productId) {
-          const productPayload = {
-            name: r.name || slug,
-            slug,
-            price: Number(r.price) || 0,
-            mrp: r.mrp ? Number(r.mrp) : null,
-            stock: r.stock ? Number(r.stock) : 0,
-            short_description: r.short_description || null,
-            description: r.description || null,
-            image_url: r.image_url || null,
-            supplier_sku: r.supplier_sku || null,
-            cost_price: r.cost_price ? Number(r.cost_price) : null,
-          };
-          const { data: up, error } = await supabase
-            .from("products")
-            .upsert(productPayload, { onConflict: "slug" })
-            .select("id")
-            .single();
-          if (error) throw error;
-          productId = up!.id;
-          productCache.set(slug, productId);
-          pCount++;
-        }
-        if (r.variant_sku || r.variant_option1_value) {
-          const { error: vErr } = await supabase.from("product_variants").insert({
-            product_id: productId,
-            sku: r.variant_sku || null,
-            price: r.variant_price ? Number(r.variant_price) : null,
-            stock: r.variant_stock ? Number(r.variant_stock) : 0,
-            option1_name: r.variant_option1_name || null,
-            option1_value: r.variant_option1_value || null,
-            option2_name: r.variant_option2_name || null,
-            option2_value: r.variant_option2_value || null,
-            supplier_sku: r.variant_supplier_sku || null,
-          });
-          if (vErr) throw vErr;
-          vCount++;
-        }
-      }
-      toast.success(`Imported ${pCount} products, ${vCount} variants`);
-      onDone();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
-    }
-  };
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault(); setDragOver(false);
-        const f = e.dataTransfer.files?.[0];
-        if (f) handleFile(f);
-      }}
-      className={`flex flex-1 items-center justify-between gap-3 rounded-full border-2 border-dashed px-4 py-2 text-sm ${dragOver ? "border-primary bg-primary/5" : "border-border"}`}
-    >
-      <span className="text-muted-foreground">
-        {busy ? "Importing…" : "Drag-drop CSV to import (columns: slug, name, price, mrp, stock, short_description, description, image_url, supplier_sku, cost_price, variant_sku, variant_price, variant_stock, variant_option1_name, variant_option1_value, variant_option2_name, variant_option2_value, variant_supplier_sku)"}
-      </span>
-      <Button size="sm" variant="outline" disabled={busy} onClick={() => inputRef.current?.click()}>Choose CSV</Button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".csv,text/csv"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-      />
-    </div>
-  );
-}
-
-function parseCsv(text: string): Record<string, string>[] {
-  const lines: string[][] = [];
-  let cur: string[] = [];
-  let field = "";
-  let inQ = false;
-  const s = text.replace(/\r\n?/g, "\n");
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (inQ) {
-      if (c === '"') {
-        if (s[i + 1] === '"') { field += '"'; i++; } else { inQ = false; }
-      } else field += c;
-    } else {
-      if (c === '"') inQ = true;
-      else if (c === ",") { cur.push(field); field = ""; }
-      else if (c === "\n") { cur.push(field); lines.push(cur); cur = []; field = ""; }
-      else field += c;
-    }
-  }
-  if (field.length || cur.length) { cur.push(field); lines.push(cur); }
-  const headers = (lines.shift() ?? []).map((h) => h.trim());
-  return lines
-    .filter((r) => r.some((c) => c.trim() !== ""))
-    .map((r) => Object.fromEntries(headers.map((h, i) => [h, (r[i] ?? "").trim()])));
-}
-
-function VariantsEditor({ productId }: { productId: string }) {
-  const qc = useQueryClient();
-  const { data: variants } = useQuery({
-    queryKey: ["admin-variants", productId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("product_variants").select("*").eq("product_id", productId).order("created_at");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-  const [draft, setDraft] = useState({ sku: "", option1_name: "Size", option1_value: "", option2_name: "", option2_value: "", price: 0, stock: 0, supplier_sku: "" });
-
-  const add = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("product_variants").insert({
-        product_id: productId,
-        sku: draft.sku || null,
-        option1_name: draft.option1_name || null,
-        option1_value: draft.option1_value || null,
-        option2_name: draft.option2_name || null,
-        option2_value: draft.option2_value || null,
-        price: draft.price || null,
-        stock: draft.stock || 0,
-        supplier_sku: draft.supplier_sku || null,
-      });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success("Variant added");
-      setDraft({ sku: "", option1_name: "Size", option1_value: "", option2_name: "", option2_value: "", price: 0, stock: 0, supplier_sku: "" });
-      qc.invalidateQueries({ queryKey: ["admin-variants", productId] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const del = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("product_variants").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-variants", productId] }),
-  });
-
-  const updateField = useMutation({
-    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, unknown> }) => {
-      const { error } = await supabase.from("product_variants").update(patch as never).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-variants", productId] }),
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  return (
-    <div className="mt-4 rounded-2xl bg-muted/40 p-4">
-      <h4 className="mb-3 font-bold uppercase tracking-wider text-sm">Variants</h4>
-      <div className="space-y-2">
-        {(variants ?? []).map((v) => (
-          <div key={v.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-2 ring-1 ring-border">
-            <Input className="w-28" placeholder="SKU" defaultValue={v.sku ?? ""} onBlur={(e) => e.target.value !== (v.sku ?? "") && updateField.mutate({ id: v.id, patch: { sku: e.target.value || null } })} />
-            <Input className="w-24" placeholder="Opt1 name" defaultValue={v.option1_name ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option1_name: e.target.value || null } })} />
-            <Input className="w-24" placeholder="Opt1 value" defaultValue={v.option1_value ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option1_value: e.target.value || null } })} />
-            <Input className="w-24" placeholder="Opt2 name" defaultValue={v.option2_name ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option2_name: e.target.value || null } })} />
-            <Input className="w-24" placeholder="Opt2 value" defaultValue={v.option2_value ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { option2_value: e.target.value || null } })} />
-            <Input className="w-24" type="number" placeholder="Price" defaultValue={v.price ?? ""} onBlur={(e) => updateField.mutate({ id: v.id, patch: { price: e.target.value ? Number(e.target.value) : null } })} />
-            <Input className="w-20" type="number" placeholder="Stock" defaultValue={v.stock} onBlur={(e) => updateField.mutate({ id: v.id, patch: { stock: Number(e.target.value) || 0 } })} />
-            <Button size="sm" variant="ghost" onClick={() => del.mutate(v.id)}>×</Button>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 flex flex-wrap items-end gap-2 rounded-xl border border-dashed p-3">
-        <div><Label className="text-xs">SKU</Label><Input className="w-28" value={draft.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })} /></div>
-        <div><Label className="text-xs">Opt1 name</Label><Input className="w-24" value={draft.option1_name} onChange={(e) => setDraft({ ...draft, option1_name: e.target.value })} /></div>
-        <div><Label className="text-xs">Opt1 value</Label><Input className="w-24" value={draft.option1_value} onChange={(e) => setDraft({ ...draft, option1_value: e.target.value })} /></div>
-        <div><Label className="text-xs">Opt2 name</Label><Input className="w-24" value={draft.option2_name} onChange={(e) => setDraft({ ...draft, option2_name: e.target.value })} /></div>
-        <div><Label className="text-xs">Opt2 value</Label><Input className="w-24" value={draft.option2_value} onChange={(e) => setDraft({ ...draft, option2_value: e.target.value })} /></div>
-        <div><Label className="text-xs">Price</Label><Input className="w-24" type="number" value={draft.price || ""} onChange={(e) => setDraft({ ...draft, price: +e.target.value })} /></div>
-        <div><Label className="text-xs">Stock</Label><Input className="w-20" type="number" value={draft.stock} onChange={(e) => setDraft({ ...draft, stock: +e.target.value })} /></div>
-        <Button size="sm" onClick={() => add.mutate()} disabled={add.isPending}>Add variant</Button>
-      </div>
-    </div>
-  );
-}
-
-type SupplierDraft = {
-  name: string;
-  platform: string;
-  contact_email: string;
-  contact_phone: string;
-  website: string;
-  api_key_ref: string;
-  notes: string;
-  is_active: boolean;
-};
-
-const EMPTY_SUPPLIER: SupplierDraft = {
-  name: "",
-  platform: "manual",
-  contact_email: "",
-  contact_phone: "",
-  website: "",
-  api_key_ref: "",
-  notes: "",
-  is_active: true,
-};
-
 function AdminSuppliers() {
   const qc = useQueryClient();
   const { data: suppliers } = useQuery({
@@ -486,7 +267,25 @@ function AdminSuppliers() {
     },
   });
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState<SupplierDraft>(EMPTY_SUPPLIER);
+  const [draft, setDraft] = useState<{
+    name: string;
+    platform: string;
+    contact_email: string;
+    contact_phone: string;
+    website: string;
+    api_key_ref: string;
+    notes: string;
+    is_active: boolean;
+  }>({
+    name: "",
+    platform: "manual",
+    contact_email: "",
+    contact_phone: "",
+    website: "",
+    api_key_ref: "",
+    notes: "",
+    is_active: true,
+  });
 
   const save = useMutation({
     mutationFn: async () => {
@@ -531,13 +330,10 @@ function AdminSuppliers() {
 
   return (
     <div className="mt-6 space-y-4">
-      <Button
-        onClick={() => { setEditing("new"); setDraft(EMPTY_SUPPLIER); }}
-        className="rounded-full"
-      >+ New Supplier</Button>
+      <Button onClick={() => { setEditing("new"); setDraft({ name: "", platform: "manual", contact_email: "", contact_phone: "", website: "", api_key_ref: "", notes: "", is_active: true }); }} className="rounded-full">+ New Supplier</Button>
 
       {editing && (
-        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-brand/5">
+        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-border">
           <h3 className="font-display text-xl uppercase">{editing === "new" ? "Add Supplier" : "Edit Supplier"}</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <div><Label>Name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
@@ -562,7 +358,7 @@ function AdminSuppliers() {
               <p className="mt-1 text-xs text-muted-foreground">Store the secret name only. The actual key lives in backend secrets.</p>
             </div>
           </div>
-          <div><Label>Notes</Label><Textarea value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></div>
+          <div><Label>Notes</Label><Input value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></div>
           <div className="flex items-center gap-2">
             <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
             <Label>Active</Label>
@@ -574,7 +370,7 @@ function AdminSuppliers() {
         </div>
       )}
 
-      <div className="rounded-3xl bg-white ring-1 ring-brand/5">
+      <div className="rounded-3xl bg-white ring-1 ring-border">
         {(suppliers ?? []).length === 0 && (
           <p className="p-6 text-sm text-muted-foreground">No suppliers yet.</p>
         )}
@@ -586,19 +382,7 @@ function AdminSuppliers() {
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive.mutate({ id: s.id, is_active: v })} />
-              <Button size="sm" variant="outline" onClick={() => {
-                setEditing(s.id);
-                setDraft({
-                  name: s.name,
-                  platform: s.platform ?? "manual",
-                  contact_email: s.contact_email ?? "",
-                  contact_phone: s.contact_phone ?? "",
-                  website: s.website ?? "",
-                  api_key_ref: s.api_key_ref ?? "",
-                  notes: s.notes ?? "",
-                  is_active: s.is_active,
-                });
-              }}>Edit</Button>
+              <Button size="sm" variant="outline" onClick={() => { setEditing(s.id); setDraft({ name: s.name, platform: s.platform ?? "manual", contact_email: s.contact_email ?? "", contact_phone: s.contact_phone ?? "", website: s.website ?? "", api_key_ref: s.api_key_ref ?? "", notes: s.notes ?? "", is_active: s.is_active }); }}>Edit</Button>
             </div>
           </div>
         ))}

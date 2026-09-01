@@ -5,9 +5,10 @@ import { useAuth } from "@/lib/auth-store";
 import { useWishlist, useToggleWishlist, useAddToCart } from "@/lib/cart";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { ProductTile } from "@/components/ProductTile";
+import { ProductTile } from "@/components/product/ProductTile";
 import { formatINR } from "@/lib/format";
 import { Trash2, ShoppingBag } from "lucide-react";
+import { EmptyState } from "@/components/common/EmptyState";
 
 export const Route = createFileRoute("/_authenticated/account")({
   head: () => ({ meta: [{ title: "My Account — GullyGadget" }] }),
@@ -45,13 +46,15 @@ function Account() {
 
         <TabsContent value="orders" className="mt-6 space-y-4">
           {(orders ?? []).length === 0 && (
-            <div className="rounded-3xl bg-white p-8 text-center ring-1 ring-brand/5">
-              <p className="text-muted-foreground">No orders yet.</p>
-              <Button asChild className="mt-4 rounded-full"><Link to="/products">Shop now</Link></Button>
-            </div>
+            <EmptyState
+              icon={<ShoppingBag className="size-8 mb-3" />}
+              title="No orders yet"
+              description="Place your first order to track deliveries and view order history."
+              action={{ label: "Shop now", to: "/products" }}
+            />
           )}
           {(orders ?? []).map((o) => (
-            <div key={o.id} className="rounded-3xl bg-white p-6 ring-1 ring-brand/5">
+            <div key={o.id} className="rounded-3xl bg-white p-6 ring-1 ring-border">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Order</p>
@@ -75,30 +78,38 @@ function Account() {
 
         <TabsContent value="wishlist" className="mt-6">
           {(wishlist ?? []).length === 0 && (
-            <div className="rounded-3xl bg-white p-8 text-center ring-1 ring-brand/5">
-              <p className="text-muted-foreground">Your wishlist is empty.</p>
-            </div>
+            <EmptyState
+              icon=<Heart className="size-8 mb-3" />
+              title="Your wishlist is empty"
+              description="Save products you love here for later."
+              action={{ label: "Continue Shopping", to: "/products" }}
+            />
           )}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(wishlist ?? []).map((w) => {
-              const p = w.product as { id: string; name: string; slug: string; price: number; mrp: number | null; image_url: string | null };
-              return (
-                <div key={w.id} className="flex gap-3 rounded-2xl bg-white p-3 ring-1 ring-brand/5">
-                  <Link to="/products/$slug" params={{ slug: p.slug }} className="size-20 shrink-0 overflow-hidden rounded-xl bg-background">
-                    <ProductTile name={p.name} imageUrl={p.image_url} />
-                  </Link>
-                  <div className="flex flex-1 flex-col">
-                    <Link to="/products/$slug" params={{ slug: p.slug }} className="font-bold hover:text-accent-cyan line-clamp-1">{p.name}</Link>
-                    <p className="font-display italic">{formatINR(p.price)}</p>
-                    <div className="mt-auto flex gap-2">
-                      <Button size="sm" onClick={() => addToCart.mutate({ productId: p.id })} className="flex-1 rounded-full"><ShoppingBag className="size-3" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => toggleWish.mutate(p.id)}><Trash2 className="size-3" /></Button>
-                    </div>
+          {(wishlist ?? []).map((w) => {
+            const p = w.product as {
+              id: string;
+              name: string;
+              slug: string;
+              price: number;
+              mrp: number | null;
+              image_url: string | null;
+            };
+            return (
+              <div key={w.id} className="flex gap-3 rounded-2xl bg-white p-3 ring-1 ring-border">
+                <Link to="/products/$slug" params={{ slug: p.slug }} className="size-20 shrink-0 overflow-hidden rounded-xl bg-background">
+                  <ProductTile name={p.name} imageUrl={p.image_url} />
+                </Link>
+                <div className="flex flex-1 flex-col">
+                  <Link to="/products/$slug" params={{ slug: p.slug }} className="font-bold hover:text-accent-cyan line-clamp-1">{p.name}</Link>
+                  <p className="font-display italic">{formatINR(p.price)}</p>
+                  <div className="mt-auto flex gap-2">
+                    <Button size="sm" onClick={() => addToCart.mutate({ productId: p.id })} className="flex-1 rounded-full"><ShoppingBag className="size-3" /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => toggleWish.mutate(p.id)}><Trash2 className="size-3" /></Button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </TabsContent>
       </Tabs>
     </div>

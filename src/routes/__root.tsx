@@ -19,8 +19,8 @@ import "@fontsource/outfit/600.css";
 import "@fontsource/outfit/700.css";
 import "@fontsource/outfit/800.css";
 import { Toaster } from "@/components/ui/sonner";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
+import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { supabase } from "@/integrations/supabase/client";
 
 function NotFoundComponent() {
@@ -162,3 +162,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+
