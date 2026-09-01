@@ -230,7 +230,9 @@ export type Database = {
           forwarding_status: string
           id: string
           notes: string | null
+          order_number: string | null
           payment_method: string
+          payment_status: string
           shipping: number
           shipping_address: Json
           status: Database["public"]["Enums"]["order_status"]
@@ -251,7 +253,9 @@ export type Database = {
           forwarding_status?: string
           id?: string
           notes?: string | null
+          order_number?: string | null
           payment_method?: string
+          payment_status?: string
           shipping?: number
           shipping_address: Json
           status?: Database["public"]["Enums"]["order_status"]
@@ -272,7 +276,9 @@ export type Database = {
           forwarding_status?: string
           id?: string
           notes?: string | null
+          order_number?: string | null
           payment_method?: string
+          payment_status?: string
           shipping?: number
           shipping_address?: Json
           status?: Database["public"]["Enums"]["order_status"]
@@ -598,19 +604,34 @@ export type Database = {
         }
         Returns: boolean
       }
-      lookup_order: {
-        Args: { _email: string; _order_id: string }
-        Returns: {
-          created_at: string
-          forwarding_status: string
-          id: string
-          status: string
-          total: number
-          tracking_carrier: string
-          tracking_number: string
-          tracking_url: string
-        }[]
-      }
+      lookup_order:
+        | {
+            Args: { _email: string; _order_id: string }
+            Returns: {
+              created_at: string
+              forwarding_status: string
+              id: string
+              status: string
+              total: number
+              tracking_carrier: string
+              tracking_number: string
+              tracking_url: string
+            }[]
+          }
+        | {
+            Args: { _email: string; _order_number: string }
+            Returns: {
+              created_at: string
+              forwarding_status: string
+              id: string
+              order_number: string
+              status: string
+              total: number
+              tracking_carrier: string
+              tracking_number: string
+              tracking_url: string
+            }[]
+          }
     }
     Enums: {
       app_role: "admin" | "customer"
