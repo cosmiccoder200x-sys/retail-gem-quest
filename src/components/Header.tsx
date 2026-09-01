@@ -43,21 +43,24 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <Link to="/" className="font-display text-xl font-extrabold uppercase tracking-tighter text-brand sm:text-2xl">
-          GullyGadget
+        <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+          Gully<span className="text-brand">Gadget</span>
         </Link>
 
-        <nav className="ml-6 hidden gap-6 text-sm font-medium uppercase tracking-wide text-brand/80 lg:flex">
-          <Link to="/products" search={{ category: "mini-coolers" }} className="hover:text-accent-cyan">
-            Mini Coolers
+        <nav className="ml-6 hidden gap-6 text-sm font-medium text-muted-foreground lg:flex">
+          <Link to="/products" search={{ category: "kitchen" }} className="hover:text-brand">
+            Kitchen
           </Link>
-          <Link to="/products" search={{ category: "kitchen-tech" }} className="hover:text-accent-cyan">
-            Kitchen Tech
+          <Link to="/products" search={{ category: "home-comfort" }} className="hover:text-brand">
+            Home Comfort
           </Link>
-          <Link to="/products" search={{ category: "smart-lighting" }} className="hover:text-accent-cyan">
-            Smart Lighting
+          <Link to="/products" search={{ category: "personal-care" }} className="hover:text-brand">
+            Personal Care
           </Link>
-          <Link to="/products" className="text-offer hover:text-offer/80">
+          <Link to="/products" search={{ category: "cleaning" }} className="hover:text-brand">
+            Cleaning
+          </Link>
+          <Link to="/products" className="font-semibold text-brand">
             ₹999 Store
           </Link>
         </nav>
