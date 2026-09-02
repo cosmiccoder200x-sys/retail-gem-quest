@@ -1,8 +1,8 @@
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ProductCard, type ProductCardData } from "@/components/ProductCard";
+import { ProductCard, type ProductCardData } from "@/components/product/ProductCard";
 import { ProductImageGallery } from "@/components/product/ProductImageGallery";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ function ProductPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge")
+        .select("id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, stock")
         .eq("category_id", product!.category_id!)
         .neq("id", product!.id)
         .eq("is_active", true)
@@ -101,9 +101,11 @@ function ProductPage() {
 
   if (!product) return null;
 
-  if (variants && variants.length > 0 && !selectedVariantId) {
-    setSelectedVariantId(variants[0].id);
-  }
+  useEffect(() => {
+    if (variants && variants.length > 0 && !selectedVariantId) {
+      setSelectedVariantId(variants[0].id);
+    }
+  }, [variants, selectedVariantId]);
 
   const selectedVariant = variants?.find((v) => v.id === selectedVariantId) ?? null;
   const displayPrice = selectedVariant?.price ?? product.price;
@@ -225,7 +227,7 @@ function ProductPage() {
             <Button
               size="lg"
               variant="outline"
-              onClick={() => toggleWish.mutate(product.id)}
+              onClick={() => toggleWish.mutate({ product_id: product.id })}
               className="rounded-full"
             >
               <Heart className="size-4" />

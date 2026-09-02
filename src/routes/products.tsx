@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,10 @@ function Catalog() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const [localQ, setLocalQ] = useState(search.q ?? "");
+
+  useEffect(() => {
+    setLocalQ(search.q ?? "");
+  }, [search.q]);
 
   const currentPage = search.page ?? 1;
   const offset = (currentPage - 1) * PAGE_SIZE;
@@ -408,6 +412,11 @@ function FilterContent({
 }) {
   const [localMin, setLocalMin] = useState(search.min ?? 0);
   const [localMax, setLocalMax] = useState(search.max ?? 2000);
+
+  useEffect(() => {
+    setLocalMin(search.min ?? 0);
+    setLocalMax(search.max ?? 2000);
+  }, [search.min, search.max]);
 
   return (
     <>
