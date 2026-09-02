@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductCard, type ProductCardData } from "@/components/ProductCard";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProductGrid } from "@/components/product/ProductGrid";
 import { formatINR } from "@/lib/format";
+import { Breadcrumb } from "@/components/common/Breadcrumb";
 
 const searchSchema = z.object({
   category: z.string().optional(),
@@ -36,7 +37,7 @@ function Catalog() {
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const { data } = await supabase.from("categories").select("name, slug").order("sort_order");
+      const { data } = await supabase.from("categories").select("name, slug").eq("is_active", true).order("sort_order");
       return data ?? [];
     },
   });
@@ -47,8 +48,9 @@ function Catalog() {
       let q = supabase
         .from("products")
         .select(
-          "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, category_id, categories!inner(slug)",
-        );
+          "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, category_id, categories!inner(slug, is_active)",
+        )
+        .eq("is_active", true);
       if (search.category) q = q.eq("categories.slug", search.category);
       if (search.q) q = q.ilike("name", `%${search.q}%`);
       if (maxPrice) q = q.lte("price", maxPrice);

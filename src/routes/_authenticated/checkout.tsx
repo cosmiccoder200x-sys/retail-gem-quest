@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
-import { useCart } from "@/lib/cart";
+import { useCart, useValidateCart, type CartItemInput } from "@/lib/cart";
 import { useAuth } from "@/lib/auth-store";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ export const Route = createFileRoute("/_authenticated/checkout")({
 function Checkout() {
   const { user } = useAuth();
   const { data: items } = useCart(!!user);
+  const { data: validation } = useValidateCart(user?.id);
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [form, setForm] = useState({
@@ -42,9 +43,15 @@ function Checkout() {
   });
   const [busy, setBusy] = useState(false);
 
-  const subtotal = (items ?? []).reduce((n, i) => n + i.product.price * i.quantity, 0);
+  const subtotal = (items ?? []).reduce((n, i) => {
+    const price = i.variant?.price ?? i.product.price;
+    return n + price * i.quantity;
+  }, 0);
   const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
   const total = subtotal + shipping;
+
+  const hasValidationErrors = validation?.some((v: { is_valid: boolean }) => !v.is_valid);
+  const validationError = validation?.find((v: { is_valid: boolean; error_message?: string }) => !v.is_valid)?.error_message;
 
   const place = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,37 +64,33 @@ function Checkout() {
       toast.error("Cart is empty");
       return;
     }
+    if (hasValidationErrors) {
+      toast.error(validationError || "Some items in your cart are no longer available");
+      return;
+    }
+
     setBusy(true);
     try {
-      const { data: order, error } = await supabase
-        .from("orders")
-        .insert({
-          user_id: user!.id,
-          subtotal,
-          shipping,
-          total,
-          shipping_address: parsed.data,
-          payment_method: "cod",
-          status: "confirmed",
-        })
-        .select("id")
-        .single();
+      // Build items array for the atomic function
+      const orderItems: CartItemInput[] = items.map((i) => ({
+        productId: i.product_id,
+        variantId: i.variant_id ?? undefined,
+        quantity: i.quantity,
+      }));
+
+      const { data: orderId, error } = await supabase.rpc("create_order_with_stock_check", {
+        p_user_id: user!.id,
+        p_items: orderItems,
+        p_shipping_address: parsed.data,
+        p_payment_method: "cod",
+        p_coupon_code: null,
+        p_customer_email: user!.email!,
+      });
+
       if (error) throw error;
 
-      const { error: itemsErr } = await supabase.from("order_items").insert(
-        items.map((i) => ({
-          order_id: order.id,
-          product_id: i.product.id,
-          product_name: i.product.name,
-          product_image: i.product.image_url,
-          price: i.product.price,
-          quantity: i.quantity,
-        }))
-      );
-      if (itemsErr) throw itemsErr;
-
-      await supabase.from("cart_items").delete().eq("user_id", user!.id);
       qc.invalidateQueries({ queryKey: ["cart"] });
+      qc.invalidateQueries({ queryKey: ["orders"] });
       toast.success("Order placed! Pay on delivery.");
       navigate({ to: "/account", hash: "orders" });
     } catch (err) {
@@ -100,6 +103,13 @@ function Checkout() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
       <h1 className="mb-8 font-display text-4xl uppercase">Checkout</h1>
+
+      {hasValidationErrors && (
+        <div className="mb-6 p-4 rounded-xl bg-destructive/10 text-destructive text-sm">
+          {validationError || "Some items in your cart are no longer available. Please review your cart."}
+        </div>
+      )}
+
       <form onSubmit={place} className="grid gap-6 sm:grid-cols-[1fr_360px]">
         <div className="rounded-3xl bg-white p-6 ring-1 ring-brand/5">
           <h2 className="font-display text-xl uppercase mb-4">Shipping Address</h2>
@@ -186,12 +196,18 @@ function Checkout() {
         <aside className="rounded-3xl bg-white p-6 ring-1 ring-brand/5">
           <h3 className="font-display text-xl uppercase">Summary</h3>
           <div className="space-y-2 text-sm">
-            {(items ?? []).map((i) => (
-              <div key={i.id} className="flex justify-between">
-                <span className="line-clamp-1">{i.product.name} × {i.quantity}</span>
-                <span>{formatINR(i.product.price * i.quantity)}</span>
-              </div>
-            ))}
+            {(items ?? []).map((i) => {
+              const price = i.variant?.price ?? i.product.price;
+              const name = i.variant?.attributes
+                ? `${i.product.name} (${Object.values(i.variant.attributes as Record<string, string>).join(", ")})`
+                : i.product.name;
+              return (
+                <div key={i.id} className="flex justify-between">
+                  <span className="line-clamp-1">{name} × {i.quantity}</span>
+                  <span>{formatINR(price * i.quantity)}</span>
+                </div>
+              );
+            })}
             <div className="border-t border-border pt-2 flex justify-between">
               <span>Subtotal</span>
               <span>{formatINR(subtotal)}</span>
@@ -205,7 +221,7 @@ function Checkout() {
               <span>{formatINR(total)}</span>
             </div>
           </div>
-          <Button type="submit" disabled={busy} size="lg" className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
+          <Button type="submit" disabled={busy || hasValidationErrors} size="lg" className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
             {busy ? "Placing…" : "Place Order"}
           </Button>
         </aside>

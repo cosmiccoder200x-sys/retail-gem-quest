@@ -1,14 +1,15 @@
-import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck } from "lucide-react";
+import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Container } from "@/components/common/Container";
-import { ProductGrid, ProductCardSkeleton, type ProductCardData } from "@/components/product/ProductGrid";
+import { ProductGrid, type ProductCardData } from "@/components/product/ProductGrid";
 import { SectionHeader } from "@/components/common/SectionHeader";
-import { Breadcrumb } from "@/components/common/Breadcrumb";
 import { Button } from "@/components/ui/button";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { formatINR } from "@/lib/format";
-import { ProductCardData as OldProductCardData } from "@/components/ProductCard";
+import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { Footer } from "@/components/layout/Footer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +44,7 @@ function Index() {
         .from("products")
         .select(productCols)
         .eq("is_featured", true)
+        .eq("is_active", true)
         .order("rating", { ascending: false })
         .limit(6);
       return (data ?? []) as unknown as ProductCardData[];
@@ -56,6 +58,7 @@ function Index() {
         .from("products")
         .select(productCols)
         .eq("is_bestseller", true)
+        .eq("is_active", true)
         .order("review_count", { ascending: false })
         .limit(8);
       return (data ?? []) as unknown as ProductCardData[];
@@ -65,7 +68,7 @@ function Index() {
   const { data: categories } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const { data } = await supabase.from("categories").select("name, slug").order("sort_order");
+      const { data } = await supabase.from("categories").select("name, slug").eq("is_active", true).order("sort_order");
       return data ?? [];
     },
   });
@@ -181,36 +184,47 @@ function Index() {
             subtitle="Explore gadgets by type"
           />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <button
+            <Link
+              to="/products"
+              search={{ category: "kitchen" }}
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
               <Sparkles className="size-6 mb-2" /> Kitchen
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/products"
+              search={{ category: "home-comfort" }}
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
               <Truck className="size-6 mb-2" /> Home Comfort
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/products"
+              search={{ category: "personal-care" }}
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
               <Gift className="size-6 mb-2" /> Personal Care
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/products"
+              search={{ category: "cleaning" }}
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
-              <Trash className="size-6 mb-2" /> Cleaning
-            </button>
-            <button
+              <Trash2 className="size-6 mb-2" /> Cleaning
+            </Link>
+            <Link
+              to="/products"
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
               <Heart className="size-6 mb-2" /> Gadgets
-            </button>
-            <button
+            </Link>
+            <Link
+              to="/products"
+              search={{ sort: "newest" }}
               className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
             >
               <RefreshCw className="size-6 mb-2" /> New
-            </button>
+            </Link>
           </div>
         </section>
       )}
