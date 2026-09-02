@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 
 export const Route = createFileRoute("/track")({
   head: () => ({
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/track")({
 
 type LookupRow = {
   id: string;
+  order_number: string | null;
   status: string;
   total: number;
   created_at: string;
@@ -36,7 +38,15 @@ type LookupRow = {
   tracking_number: string | null;
   tracking_url: string | null;
   forwarding_status: string | null;
+  fulfillment_status: string | null;
+  payment_status: string | null;
+  payment_method: string | null;
+  customer_email: string | null;
 };
+
+function isUuid(v: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
 
 function TrackPage() {
   const [orderId, setOrderId] = useState("");
@@ -53,10 +63,12 @@ function TrackPage() {
     }
     setLoading(true);
     setSearched(true);
-    const { data, error } = await supabase.rpc("lookup_order", {
-      _order_id: orderId.trim(),
-      _email: email.trim(),
-    });
+    const trimmed = orderId.trim();
+    // lookup_order has two overloads: UUID and TEXT (order_number)
+    const rpcArgs = isUuid(trimmed)
+      ? { _order_id: trimmed, _email: email.trim() }
+      : { _order_number: trimmed, _email: email.trim() };
+    const { data, error } = await supabase.rpc("lookup_order", rpcArgs as never);
     setLoading(false);
     if (error) {
       toast.error(error.message);
@@ -71,18 +83,18 @@ function TrackPage() {
     <div className="mx-auto max-w-2xl px-4 py-12">
       <h1 className="text-3xl font-bold tracking-tight">Track your order</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Enter the order ID from your confirmation email and the email used at checkout.
+        Enter the order ID or order number from your confirmation email and the email used at checkout.
       </p>
 
       <Card className="mt-6 p-6">
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="orderId">Order ID</Label>
+            <Label htmlFor="orderId">Order ID or Order Number</Label>
             <Input
               id="orderId"
               value={orderId}
               onChange={(e) => setOrderId(e.target.value)}
-              placeholder="e.g. 1a2b3c4d-..."
+              placeholder="e.g. ORD-2026-000001 or 1a2b3c4d-..."
             />
           </div>
           <div className="space-y-2">
@@ -103,30 +115,42 @@ function TrackPage() {
 
       {searched && !loading && !result && (
         <Card className="mt-6 p-6 text-center text-sm text-muted-foreground">
-          No order found. Double-check your order ID and email.
+          No order found. Double-check your order ID/number and email.
         </Card>
       )}
 
       {result && (
-        <Card className="mt-6 space-y-4 p-6">
+        <Card className="mt-6 space-y-5 p-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xs uppercase text-muted-foreground">Order</div>
-              <div className="font-mono text-sm">{result.id}</div>
+              <div className="font-mono text-sm">{result.order_number ?? result.id}</div>
+              {result.order_number && <div className="font-mono text-xs text-muted-foreground">{result.id.slice(0, 8)}</div>}
             </div>
             <div className="text-right">
               <div className="text-xs uppercase text-muted-foreground">Total</div>
               <div className="font-semibold">{formatINR(Number(result.total))}</div>
+              <div className="text-xs text-muted-foreground capitalize">{result.payment_method} · {result.payment_status}</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <OrderTimeline
+            createdAt={result.created_at}
+            fulfillmentStatus={result.fulfillment_status}
+            forwardingStatus={result.forwarding_status}
+            hasTracking={!!result.tracking_number}
+            carrier={result.tracking_carrier}
+            trackingNumber={result.tracking_number}
+            trackingUrl={result.tracking_url}
+          />
+
+          <div className="grid grid-cols-2 gap-4 text-sm border-t border-border pt-4">
             <div>
-              <div className="text-xs uppercase text-muted-foreground">Status</div>
+              <div className="text-xs uppercase text-muted-foreground">Order Status</div>
               <div className="font-medium capitalize">{result.status}</div>
             </div>
             <div>
-              <div className="text-xs uppercase text-muted-foreground">Fulfillment</div>
+              <div className="text-xs uppercase text-muted-foreground">Forwarding</div>
               <div className="font-medium capitalize">{result.forwarding_status ?? "pending"}</div>
             </div>
             <div>
@@ -135,7 +159,7 @@ function TrackPage() {
             </div>
             <div>
               <div className="text-xs uppercase text-muted-foreground">Tracking #</div>
-              <div className="font-medium">{result.tracking_number ?? "—"}</div>
+              <div className="font-medium font-mono text-xs">{result.tracking_number ?? "—"}</div>
             </div>
           </div>
 
@@ -152,6 +176,14 @@ function TrackPage() {
 
           <p className="text-xs text-muted-foreground">
             Placed on {new Date(result.created_at).toLocaleString()}
+            {result.order_number && (
+              <>
+                {" · "}
+                <Link to="/track" className="underline">
+                  Tracking link for this order
+                </Link>
+              </>
+            )}
           </p>
         </Card>
       )}

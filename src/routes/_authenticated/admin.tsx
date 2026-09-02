@@ -55,6 +55,15 @@ function AdminOrders() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const { data: suppliers } = useQuery({
+    queryKey: ["admin-suppliers-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("suppliers").select("id, name").eq("is_active", true).order("name");
+      return data ?? [];
+    },
+  });
 
   const { data: orders, isPending } = useQuery({
     queryKey: ["admin-orders", filter, search],
@@ -67,6 +76,12 @@ function AdminOrders() {
       else if (filter === "unpaid") q = q.eq("payment_status", "pending").eq("payment_method", "online");
       else if (filter === "failed") q = q.eq("payment_status", "failed");
       else if (filter === "refunded") q = q.eq("payment_status", "refunded");
+      else if (filter === "fwd-pending") q = q.eq("forwarding_status", "pending");
+      else if (filter === "fwd-forwarded") q = q.eq("forwarding_status", "forwarded");
+      else if (filter === "fwd-failed") q = q.eq("forwarding_status", "failed");
+      else if (filter === "ful-pending") q = q.eq("fulfillment_status", "pending");
+      else if (filter === "ful-shipped") q = q.eq("fulfillment_status", "shipped");
+      else if (filter === "ful-delivered") q = q.eq("fulfillment_status", "delivered");
       else if (filter !== "all") q = q.eq("status", filter);
 
       if (search) q = q.ilike("order_number", `%${search}%`);
@@ -88,6 +103,57 @@ function AdminOrders() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const forward = useMutation({
+    mutationFn: async ({ id, supplierId }: { id: string; supplierId?: string }) => {
+      const patch: Record<string, unknown> = {
+        forwarding_status: "forwarded",
+        forwarded_at: new Date().toISOString(),
+        fulfillment_status: "processing",
+      };
+      if (supplierId) patch.supplier_id = supplierId;
+      // Also confirm the order if still pending
+      const order = orders?.find((o) => o.id === id);
+      if (order?.status === "pending") patch.status = "confirmed";
+      const { error } = await supabase.from("orders").update(patch as never).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Forwarded to supplier");
+      qc.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bulkForward = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selected);
+      if (ids.length === 0) throw new Error("No orders selected");
+      // Only forward pending forwarding_status
+      const pendingIds = ids.filter((id) => {
+        const o = orders?.find((x) => x.id === id);
+        return o?.forwarding_status === "pending";
+      });
+      if (pendingIds.length === 0) throw new Error("No pending orders selected");
+      for (const id of pendingIds) {
+        const order = orders?.find((o) => o.id === id);
+        const patch: Record<string, unknown> = {
+          forwarding_status: "forwarded",
+          forwarded_at: new Date().toISOString(),
+          fulfillment_status: "processing",
+        };
+        if (order?.status === "pending") patch.status = "confirmed";
+        const { error } = await supabase.from("orders").update(patch as never).eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success("Bulk forwarded");
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["admin-orders"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const filters = [
     { value: "all", label: "All" },
     { value: "pending", label: "Pending" },
@@ -101,6 +167,12 @@ function AdminOrders() {
     { value: "cod", label: "COD" },
     { value: "online", label: "Online" },
     { value: "refunded", label: "Refunded" },
+    { value: "fwd-pending", label: "Fwd: Pending" },
+    { value: "fwd-forwarded", label: "Fwd: Done" },
+    { value: "fwd-failed", label: "Fwd: Failed" },
+    { value: "ful-pending", label: "Ful: Pending" },
+    { value: "ful-shipped", label: "Ful: Shipped" },
+    { value: "ful-delivered", label: "Ful: Delivered" },
   ];
 
   return (
@@ -128,13 +200,36 @@ function AdminOrders() {
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex items-center gap-2 rounded-2xl bg-brand-soft p-3">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <Button size="sm" className="rounded-full ml-auto" onClick={() => bulkForward.mutate()} disabled={bulkForward.isPending}>
+            Forward selected
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
+        </div>
+      )}
+
       {/* Orders List */}
       {isPending && <p className="text-sm text-muted-foreground">Loading orders…</p>}
       {!isPending && (orders ?? []).length === 0 && (
         <p className="text-sm text-muted-foreground">No orders match this filter.</p>
       )}
       {(orders ?? []).map((o) => (
-        <OrderRow key={o.id} order={o} onSave={(patch) => update.mutate({ id: o.id, patch })} />
+        <OrderRow
+          key={o.id}
+          order={o}
+          suppliers={suppliers ?? []}
+          selected={selected.has(o.id)}
+          onToggleSelect={(v) => {
+            const next = new Set(selected);
+            if (v) next.add(o.id);
+            else next.delete(o.id);
+            setSelected(next);
+          }}
+          onSave={(patch) => update.mutate({ id: o.id, patch })}
+          onForward={(supplierId) => forward.mutate({ id: o.id, supplierId })}
+        />
       ))}
     </div>
   );
@@ -142,18 +237,30 @@ function AdminOrders() {
 
 function OrderRow({
   order,
+  suppliers,
+  selected,
+  onToggleSelect,
   onSave,
+  onForward,
 }: {
   order: Record<string, unknown>;
+  suppliers: { id: string; name: string }[];
+  selected: boolean;
+  onToggleSelect: (v: boolean) => void;
   onSave: (patch: Record<string, unknown>) => void;
+  onForward: (supplierId?: string) => void;
 }) {
   const [carrier, setCarrier] = useState((order.tracking_carrier as string) ?? "");
   const [number, setNumber] = useState((order.tracking_number as string) ?? "");
   const [url, setUrl] = useState((order.tracking_url as string) ?? "");
+  const [supplierId, setSupplierId] = useState((order.supplier_id as string) ?? "");
+  const isPaidOrCod = order.payment_status === "paid" || order.payment_method === "cod";
+  const canForward = order.forwarding_status === "pending" && isPaidOrCod && order.status !== "cancelled";
 
   return (
     <div className="rounded-3xl bg-white p-4 ring-1 ring-border">
       <div className="flex flex-wrap items-center gap-3">
+        <input type="checkbox" checked={selected} onChange={(e) => onToggleSelect(e.target.checked)} className="size-4 rounded" />
         <span className="font-mono text-xs">
           {order.order_number ? String(order.order_number) : `#${String(order.id).slice(0, 8)}`}
         </span>
@@ -170,6 +277,19 @@ function OrderRow({
         <span className="text-xs bg-muted px-2 py-0.5 rounded-full capitalize">
           {String(order.status)}
         </span>
+        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full capitalize">
+          Ful: {String(order.fulfillment_status ?? "pending")}
+        </span>
+        {order.forwarded_at && (
+          <span className="text-xs text-muted-foreground">
+            Fwd: {new Date(order.forwarded_at as string).toLocaleDateString()}
+          </span>
+        )}
+        {order.supplier_id && (
+          <span className="text-xs bg-secondary px-2 py-0.5 rounded-full">
+            {suppliers.find((s) => s.id === order.supplier_id)?.name ?? String(order.supplier_id).slice(0, 6)}
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <Select
             value={String(order.status)}
@@ -202,6 +322,58 @@ function OrderRow({
           </Select>
         </div>
       </div>
+
+      {/* Supplier + Forward action */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Select value={supplierId} onValueChange={setSupplierId}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Select supplier" />
+          </SelectTrigger>
+          <SelectContent>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {canForward ? (
+          <Button size="sm" className="rounded-full" onClick={() => onForward(supplierId || undefined)}>
+            Forward to supplier
+          </Button>
+        ) : order.forwarding_status === "forwarded" ? (
+          <span className="text-xs text-success font-medium">✓ Forwarded {order.forwarded_at ? `on ${new Date(order.forwarded_at as string).toLocaleDateString()}` : ""}</span>
+        ) : !isPaidOrCod ? (
+          <span className="text-xs text-muted-foreground">Awaiting payment</span>
+        ) : null}
+        {!canForward && order.forwarding_status === "pending" && isPaidOrCod && (
+          <Button size="sm" variant="outline" className="rounded-full" onClick={() => onForward(supplierId || undefined)}>
+            Mark forwarded
+          </Button>
+        )}
+      </div>
+
+      {/* Fulfillment status */}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Fulfillment:</span>
+        <Select
+          value={String(order.fulfillment_status ?? "pending")}
+          onValueChange={(v) => onSave({ fulfillment_status: v })}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="processing">Processing</SelectItem>
+            <SelectItem value="packed">Packed</SelectItem>
+            <SelectItem value="shipped">Shipped</SelectItem>
+            <SelectItem value="out_for_delivery">Out for delivery</SelectItem>
+            <SelectItem value="delivered">Delivered</SelectItem>
+            <SelectItem value="returned">Returned</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <Input placeholder="Carrier" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
         <Input placeholder="Tracking #" value={number} onChange={(e) => setNumber(e.target.value)} />
@@ -241,21 +413,43 @@ function AdminProducts() {
     },
   });
 
+  const lowStock = (products ?? []).filter((p) => p.is_active !== false && p.stock <= 5);
+
   return (
-    <div className="mt-6 rounded-3xl bg-white ring-1 ring-border">
-      {(products ?? []).map((p) => (
-        <div
-          key={p.id}
-          className={`flex items-center gap-4 border-b border-border p-4 last:border-0 ${p.is_active === false ? "opacity-50" : ""}`}
-        >
-          <img src={p.images?.[0]?.url || p.image_url} alt={p.name} className="w-14 h-14 rounded-xl object-cover shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="font-bold truncate">{p.name}</p>
-            <p className="text-xs text-muted-foreground">{p.slug} · Stock: {p.stock}</p>
-          </div>
-          <span className="font-display italic shrink-0">{formatINR(Number(p.price))}</span>
+    <div className="mt-6 space-y-4">
+      {lowStock.length > 0 && (
+        <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+          <p className="text-sm font-bold text-amber-800">Low stock — {lowStock.length} product(s) ≤ 5 units</p>
+          <ul className="mt-2 space-y-1 text-xs text-amber-700">
+            {lowStock.slice(0, 8).map((p) => (
+              <li key={p.id} className="flex justify-between">
+                <span>{p.name} ({p.slug})</span>
+                <span className="font-mono font-bold">{p.stock} left</span>
+              </li>
+            ))}
+            {lowStock.length > 8 && <li className="text-muted-foreground">+ {lowStock.length - 8} more</li>}
+          </ul>
         </div>
-      ))}
+      )}
+      <div className="rounded-3xl bg-white ring-1 ring-border">
+        {(products ?? []).map((p) => {
+          const isLow = p.is_active !== false && p.stock <= 5;
+          const isOut = p.stock === 0;
+          return (
+            <div
+              key={p.id}
+              className={`flex items-center gap-4 border-b border-border p-4 last:border-0 ${p.is_active === false ? "opacity-50" : ""} ${isLow ? "bg-amber-50/50" : ""}`}
+            >
+              <img src={p.images?.[0]?.url || p.image_url} alt={p.name} className="w-14 h-14 rounded-xl object-cover shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold truncate">{p.name} {isOut ? <span className="ml-1 text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded-full">Out</span> : isLow ? <span className="ml-1 text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full">{p.stock} left</span> : null}</p>
+                <p className="text-xs text-muted-foreground">{p.slug} · Stock: {p.stock}</p>
+              </div>
+              <span className="font-display italic shrink-0">{formatINR(Number(p.price))}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

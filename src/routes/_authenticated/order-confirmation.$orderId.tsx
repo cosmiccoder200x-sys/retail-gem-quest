@@ -6,6 +6,7 @@ import { formatINR } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, ShoppingBag, Truck, CreditCard } from "lucide-react";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 
 export const Route = createFileRoute("/_authenticated/order-confirmation/$orderId")({
   head: () => ({ meta: [{ title: "Order Confirmed — GullyGadget" }] }),
@@ -59,7 +60,7 @@ function OrderConfirmation() {
 
   const isPaid = order.payment_status === "paid";
   const isCOD = order.payment_method === "cod";
-
+  const hasTracking = !!order.tracking_number;
   const addr = order.shipping_address_snapshot as Record<string, string> | null;
 
   return (
@@ -77,6 +78,21 @@ function OrderConfirmation() {
             ? "Your payment has been received and verified."
             : "Your order has been placed. Complete payment to confirm."}
         </p>
+      </div>
+
+      {/* Timeline */}
+      <div className="rounded-3xl bg-white p-6 ring-1 ring-brand/5 mb-6">
+        <h2 className="font-display text-sm uppercase tracking-widest text-muted-foreground mb-4">Order Progress</h2>
+        <OrderTimeline
+          createdAt={order.created_at}
+          forwardedAt={order.forwarded_at}
+          fulfillmentStatus={order.fulfillment_status}
+          forwardingStatus={order.forwarding_status}
+          hasTracking={hasTracking}
+          carrier={order.tracking_carrier}
+          trackingNumber={order.tracking_number}
+          trackingUrl={order.tracking_url}
+        />
       </div>
 
       {/* Order Details Card */}
@@ -188,6 +204,14 @@ function OrderConfirmation() {
           <Link to="/products">Continue Shopping</Link>
         </Button>
       </div>
+
+      {hasTracking && (
+        <div className="mt-4 text-center">
+          <Link to="/track" className="text-sm text-brand hover:underline">
+            Track this order →
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

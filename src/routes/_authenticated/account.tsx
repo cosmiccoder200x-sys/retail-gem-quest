@@ -10,8 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProductTile } from "@/components/product/ProductTile";
 import { formatINR } from "@/lib/format";
-import { Trash2, ShoppingBag, RefreshCw, CreditCard, User, MapPin, Plus, Check } from "lucide-react";
+import { Trash2, ShoppingBag, RefreshCw, CreditCard, User, MapPin, Truck } from "lucide-react";
 import { EmptyState } from "@/components/common/EmptyState";
+import { OrderTimeline } from "@/components/orders/OrderTimeline";
 import { toast } from "sonner";
 
 declare global {
@@ -268,6 +269,7 @@ function Account() {
           )}
           {(orders ?? []).map((o) => {
             const isUnpaid = o.payment_method === "online" && o.payment_status !== "paid" && o.status !== "cancelled";
+            const hasTracking = !!o.tracking_number;
             return (
               <div key={o.id} className="rounded-3xl bg-white p-6 ring-1 ring-border">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -291,6 +293,29 @@ function Account() {
                     </div>
                   ))}
                 </div>
+                <div className="mt-4 border-t border-border pt-4">
+                  <OrderTimeline
+                    createdAt={o.created_at}
+                    forwardedAt={o.forwarded_at}
+                    fulfillmentStatus={o.fulfillment_status}
+                    forwardingStatus={o.forwarding_status}
+                    hasTracking={hasTracking}
+                    carrier={o.tracking_carrier}
+                    trackingNumber={o.tracking_number}
+                    trackingUrl={o.tracking_url}
+                    compact
+                  />
+                </div>
+                {hasTracking && o.tracking_url && (
+                  <a
+                    href={o.tracking_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                  >
+                    <Truck className="size-3" /> Track with {o.tracking_carrier ?? "carrier"} →
+                  </a>
+                )}
                 {isUnpaid && (
                   <div className="mt-4 pt-3 border-t border-border">
                     <Button size="sm" onClick={() => retryPayment(o.id)} disabled={retryingId === o.id} className="rounded-full bg-brand hover:bg-accent-cyan">
