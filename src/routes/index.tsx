@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag } from "lucide-react";
+import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag, Star } from "lucide-react";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -90,10 +90,11 @@ function Index() {
           </Link>
 
           <nav className="ml-auto hidden gap-3 text-sm font-medium text-muted-foreground lg:flex">
-            <Link to="/products" search={{ category: "kitchen" }} className="hover:text-brand">Kitchen</Link>
-            <Link to="/products" search={{ category: "home-comfort" }} className="hover:text-brand">Home Comfort</Link>
-            <Link to="/products" search={{ category: "personal-care" }} className="hover:text-brand">Personal Care</Link>
-            <Link to="/products" search={{ category: "cleaning" }} className="hover:text-brand">Cleaning</Link>
+            {(categories ?? []).slice(0, 4).map((cat) => (
+              <Link key={cat.slug} to="/products" search={{ category: cat.slug }} className="hover:text-brand">
+                {cat.name}
+              </Link>
+            ))}
             <Link to="/products" className="font-semibold text-brand">₹999 Store</Link>
           </nav>
 

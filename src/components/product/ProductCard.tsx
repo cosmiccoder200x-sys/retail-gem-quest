@@ -16,7 +16,9 @@ export type ProductCardData = {
   rating: number;
   review_count: number;
   badge: string | null;
+  stock: number;
   is_bestseller?: boolean;
+  is_featured?: boolean;
 };
 
 export function ProductCardSkeleton() {
@@ -54,11 +56,21 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             {product.badge}
           </span>
         )}
+        {product.stock === 0 && (
+          <span className="absolute bottom-4 left-4 rounded-full bg-destructive px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-destructive-foreground shadow-sm">
+            Out of stock
+          </span>
+        )}
+        {product.stock > 0 && product.stock <= 5 && (
+          <span className="absolute bottom-4 left-4 rounded-full bg-amber-500 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-sm">
+            Only {product.stock} left
+          </span>
+        )}
         <button
           aria-label="Add to wishlist"
           onClick={(e) => {
             e.preventDefault();
-            toggleWish.mutate(product.id);
+            toggleWish.mutate({ product_id: product.id });
           }}
           className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/90 text-brand shadow-sm transition hover:bg-white hover:text-offer"
         >
@@ -97,10 +109,10 @@ export function ProductCard({ product }: { product: ProductCardData }) {
         <Button
           size="icon"
           variant="default"
-          className="rounded-full bg-brand text-brand-foreground hover:bg-accent-cyan"
-          aria-label="Add to cart"
+          className="rounded-full bg-brand text-brand-foreground hover:bg-accent-cyan disabled:opacity-50"
+          aria-label={product.stock === 0 ? "Out of stock" : "Add to cart"}
           onClick={() => addToCart.mutate({ product_id: product.id })}
-          disabled={addToCart.isPending}
+          disabled={addToCart.isPending || product.stock === 0}
         >
           <ShoppingBag className="size-4" />
         </Button>

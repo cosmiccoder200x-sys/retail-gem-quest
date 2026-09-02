@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { X, Search, ShoppingBag, User, Menu } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { X, Search, ShoppingBag, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,11 +57,11 @@ export function MobileMenu() {
           </form>
 
           <nav className="flex flex-col gap-1 px-4 pb-4">
-            <MobileLink to="/products" search={{ category: "kitchen" }} onClick={() => {}}>Kitchen</MobileLink>
-            <MobileLink to="/products" search={{ category: "home-comfort" }} onClick={() => {}}>Home Comfort</MobileLink>
-            <MobileLink to="/products" search={{ category: "personal-care" }} onClick={() => {}}>Personal Care</MobileLink>
-            <MobileLink to="/products" search={{ category: "cleaning" }} onClick={() => {}}>Cleaning</MobileLink>
-            <MobileLink to="/products" onClick={() => {}}>₹999 Store</MobileLink>
+            <MobileLink to="/products" search={{ category: "kitchen" }}>Kitchen</MobileLink>
+            <MobileLink to="/products" search={{ category: "home-comfort" }}>Home Comfort</MobileLink>
+            <MobileLink to="/products" search={{ category: "personal-care" }}>Personal Care</MobileLink>
+            <MobileLink to="/products" search={{ category: "cleaning" }}>Cleaning</MobileLink>
+            <MobileLink to="/products">₹999 Store</MobileLink>
           </nav>
 
           <div className="flex items-center gap-3 px-4 pb-4 pt-2 border-t border-border">
@@ -83,24 +83,21 @@ export function MobileMenu() {
 function MobileLink({
   to,
   search,
-  onClick,
   children,
 }: {
   to: string;
   search?: Record<string, string>;
-  onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
     <DrawerClose asChild>
-      <a
+      <Link
         to={to}
         search={search}
-        onClick={onClick}
-        className="rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-brand-soft hover:text-brand"
+        className="block rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-brand-soft hover:text-brand"
       >
         {children}
-      </a>
+      </Link>
     </DrawerClose>
   );
 }

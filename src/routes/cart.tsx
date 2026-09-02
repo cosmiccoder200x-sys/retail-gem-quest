@@ -22,7 +22,35 @@ function CartPage() {
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
 
-  if (loading) return <div className="p-12 text-center">Loading…</div>;
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <h1 className="mb-8 font-display text-4xl uppercase">Your Cart</h1>
+        <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex gap-4 rounded-2xl bg-white p-4 ring-1 ring-brand/5 animate-pulse">
+                <div className="size-24 rounded-xl bg-secondary" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-secondary rounded w-3/4" />
+                  <div className="h-3 bg-secondary rounded w-1/2" />
+                  <div className="h-8 bg-secondary rounded w-24 mt-auto" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-3xl bg-white p-6 ring-1 ring-brand/5 animate-pulse">
+            <div className="h-6 bg-secondary rounded w-1/2 mb-4" />
+            <div className="space-y-2">
+              <div className="h-4 bg-secondary rounded" />
+              <div className="h-4 bg-secondary rounded" />
+              <div className="h-4 bg-secondary rounded" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!user) {
     return (
       <div className="mx-auto max-w-md px-6 py-20 text-center">

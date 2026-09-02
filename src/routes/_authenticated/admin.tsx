@@ -6,6 +6,9 @@ import { useAuth, useIsAdmin } from "@/lib/auth-store";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/format";
 import { toast } from "sonner";
@@ -36,10 +39,12 @@ function Admin() {
         <TabsList>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><AdminOrders /></TabsContent>
         <TabsContent value="products"><AdminProducts /></TabsContent>
+        <TabsContent value="categories"><AdminCategories /></TabsContent>
         <TabsContent value="suppliers"><AdminSuppliers /></TabsContent>
       </Tabs>
     </div>
@@ -251,6 +256,163 @@ function AdminProducts() {
           <span className="font-display italic shrink-0">{formatINR(Number(p.price))}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AdminCategories() {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ name: "", slug: "", description: "", image_url: "", sort_order: 0, is_active: true });
+
+  const { data: categories } = useQuery({
+    queryKey: ["admin-categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("*").order("sort_order");
+      return data ?? [];
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!draft.name.trim() || !draft.slug.trim()) throw new Error("Name and slug are required");
+      const payload = {
+        name: draft.name.trim(),
+        slug: draft.slug.trim().toLowerCase().replace(/\s+/g, "-"),
+        description: draft.description.trim() || null,
+        image_url: draft.image_url.trim() || null,
+        sort_order: draft.sort_order,
+        is_active: draft.is_active,
+      };
+      if (editing === "new") {
+        const { error } = await supabase.from("categories").insert(payload);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("categories").update(payload).eq("id", editing!);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing === "new" ? "Category created" : "Category updated");
+      setEditing(null);
+      qc.invalidateQueries({ queryKey: ["admin-categories"] });
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["header-categories"] });
+      qc.invalidateQueries({ queryKey: ["category-counts"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const archive = useMutation({
+    mutationFn: async (id: string) => {
+      const cat = categories?.find((c) => c.id === id);
+      const { error } = await supabase.from("categories").update({ is_active: !cat?.is_active }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Category updated");
+      qc.invalidateQueries({ queryKey: ["admin-categories"] });
+      qc.invalidateQueries({ queryKey: ["categories"] });
+      qc.invalidateQueries({ queryKey: ["header-categories"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-6 space-y-4">
+      <Button
+        onClick={() => {
+          setEditing("new");
+          setDraft({ name: "", slug: "", description: "", image_url: "", sort_order: (categories?.length ?? 0) + 1, is_active: true });
+        }}
+        className="rounded-full"
+      >
+        + New Category
+      </Button>
+
+      {editing && (
+        <div className="space-y-4 rounded-3xl bg-white p-6 ring-1 ring-border">
+          <h3 className="font-display text-xl uppercase">{editing === "new" ? "Add Category" : "Edit Category"}</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Name *</Label>
+              <Input
+                value={draft.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setDraft({
+                    ...draft,
+                    name,
+                    slug: editing === "new" ? name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") : draft.slug,
+                  });
+                }}
+                placeholder="Category name"
+              />
+            </div>
+            <div>
+              <Label>Slug *</Label>
+              <Input value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} placeholder="category-slug" />
+            </div>
+            <div>
+              <Label>Sort Order</Label>
+              <Input type="number" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Image URL</Label>
+              <Input value={draft.image_url} onChange={(e) => setDraft({ ...draft, image_url: e.target.value })} placeholder="https://..." />
+            </div>
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={2} placeholder="Category description" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={draft.is_active} onCheckedChange={(v) => setDraft({ ...draft, is_active: v })} />
+            <Label>Active (visible to customers)</Label>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => save.mutate()} disabled={save.isPending} className="rounded-full">
+              {editing === "new" ? "Create" : "Update"}
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-3xl bg-white ring-1 ring-border">
+        {(categories ?? []).length === 0 && <p className="p-6 text-sm text-muted-foreground">No categories yet.</p>}
+        {(categories ?? []).map((cat) => (
+          <div key={cat.id} className={`flex items-center gap-4 border-b border-border p-4 last:border-0 ${!cat.is_active ? "opacity-50" : ""}`}>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold">{cat.name} {!cat.is_active && <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded-full">Archived</span>}</p>
+              <p className="text-xs text-muted-foreground">{cat.slug} · Sort: {cat.sort_order}</p>
+              {cat.description && <p className="text-xs text-muted-foreground truncate">{cat.description}</p>}
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditing(cat.id);
+                  setDraft({
+                    name: cat.name,
+                    slug: cat.slug,
+                    description: cat.description ?? "",
+                    image_url: cat.image_url ?? "",
+                    sort_order: cat.sort_order,
+                    is_active: cat.is_active,
+                  });
+                }}
+              >
+                Edit
+              </Button>
+              <Button size="sm" variant={cat.is_active ? "ghost" : "default"} onClick={() => archive.mutate(cat.id)} className={cat.is_active ? "text-destructive" : ""}>
+                {cat.is_active ? "Archive" : "Restore"}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
