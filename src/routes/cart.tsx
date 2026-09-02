@@ -35,7 +35,10 @@ function CartPage() {
     );
   }
 
-  const subtotal = (items ?? []).reduce((n, i) => n + i.product.price * i.quantity, 0);
+  const subtotal = (items ?? []).reduce((n, i) => {
+    const price = i.variant?.price ?? i.product.price;
+    return n + price * i.quantity;
+  }, 0);
   const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
   const total = subtotal - discount + shipping;
 
@@ -90,7 +93,7 @@ function CartPage() {
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-display text-lg italic">{formatINR(it.product.price * it.quantity)}</span>
+                    <span className="font-display text-lg italic">{formatINR(it.variant?.price ?? it.product.price) * it.quantity}</span>
                     <button
                       aria-label="Remove"
                       onClick={() => remove.mutate(it.id)}

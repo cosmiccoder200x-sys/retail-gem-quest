@@ -19,6 +19,21 @@ export type ProductCardData = {
   is_bestseller?: boolean;
 };
 
+export function ProductCardSkeleton() {
+  return (
+    <div className="flex flex-col animate-pulse">
+      <div className="mb-4 aspect-[4/5] rounded-3xl bg-secondary" />
+      <div className="h-3 w-16 bg-secondary rounded mb-1" />
+      <div className="h-4 w-3/4 bg-secondary rounded mb-1" />
+      <div className="h-3 w-1/2 bg-secondary rounded mb-2" />
+      <div className="flex items-end justify-between">
+        <div className="h-6 w-20 bg-secondary rounded" />
+        <div className="h-9 w-9 bg-secondary rounded-full" />
+      </div>
+    </div>
+  );
+}
+
 export function ProductCard({ product }: { product: ProductCardData }) {
   const addToCart = useAddToCart();
   const toggleWish = useToggleWishlist();
@@ -84,7 +99,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           variant="default"
           className="rounded-full bg-brand text-brand-foreground hover:bg-accent-cyan"
           aria-label="Add to cart"
-          onClick={() => addToCart.mutate({ productId: product.id })}
+          onClick={() => addToCart.mutate({ product_id: product.id })}
           disabled={addToCart.isPending}
         >
           <ShoppingBag className="size-4" />

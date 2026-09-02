@@ -27,8 +27,8 @@ export type CartItem = {
 };
 
 export type CartItemInput = {
-  productId: string;
-  variantId?: string;
+  product_id: string;
+  variant_id?: string;
   quantity?: number;
 };
 
@@ -60,7 +60,7 @@ export function useCart(enabled: boolean) {
 export function useAddToCart() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ productId, variantId, quantity = 1 }: CartItemInput) => {
+    mutationFn: async ({ product_id, variant_id, quantity = 1 }: CartItemInput) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error("Please sign in to add items to cart");
 
@@ -69,10 +69,10 @@ export function useAddToCart() {
         .from("cart_items")
         .select("id, quantity")
         .eq("user_id", user.user.id)
-        .eq("product_id", productId);
+        .eq("product_id", product_id);
 
-      if (variantId) {
-        query.eq("variant_id", variantId);
+      if (variant_id) {
+        query.eq("variant_id", variant_id);
       } else {
         query.is("variant_id", null);
       }
@@ -90,8 +90,8 @@ export function useAddToCart() {
           .from("cart_items")
           .insert({
             user_id: user.user.id,
-            product_id: productId,
-            variant_id: variantId ?? null,
+            product_id: product_id,
+            variant_id: variant_id ?? null,
             quantity,
           });
         if (error) throw error;
@@ -153,7 +153,7 @@ export function useWishlist(enabled: boolean) {
 export function useToggleWishlist() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ productId, variantId }: { productId: string; variantId?: string }) => {
+    mutationFn: async ({ product_id, variant_id }: { product_id: string; variant_id?: string }) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error("Please sign in");
 
@@ -161,13 +161,7 @@ export function useToggleWishlist() {
         .from("wishlist_items")
         .select("id")
         .eq("user_id", user.user.id)
-        .eq("product_id", productId);
-
-      if (variantId) {
-        query.eq("variant_id", variantId);
-      } else {
-        query.is("variant_id", null);
-      }
+        .eq("product_id", product_id);
 
       const { data: existing } = await query.maybeSingle();
 
@@ -178,8 +172,8 @@ export function useToggleWishlist() {
 
       await supabase.from("wishlist_items").insert({
         user_id: user.user.id,
-        product_id: productId,
-        variant_id: variantId ?? null,
+        product_id: product_id,
+        variant_id: variant_id ?? null,
       });
       return { added: true };
     },

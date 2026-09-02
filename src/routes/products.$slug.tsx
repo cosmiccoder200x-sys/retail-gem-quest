@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +36,7 @@ function ProductPage() {
   const { slug } = Route.useParams();
   const addToCart = useAddToCart();
   const toggleWish = useToggleWishlist();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
@@ -46,6 +47,7 @@ function ProductPage() {
         .from("products")
         .select("*, categories(name, slug)")
         .eq("slug", slug)
+        .eq("is_active", true)
         .maybeSingle();
       if (error) throw error;
       if (!data) throw notFound();
@@ -115,7 +117,7 @@ function ProductPage() {
 
   const addToCartWithVariant = useMutation({
     mutationFn: async ({ productId, variantId }: { productId: string; variantId?: string }) => {
-      await addToCart.mutateAsync({ productId, variantId });
+      await addToCart.mutateAsync({ product_id: productId, variant_id: variantId ?? undefined });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cart"] });
@@ -208,6 +210,17 @@ function ProductPage() {
               className="flex-1 rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan"
             >
               <ShoppingBag className="mr-2 size-4" /> Add to Cart
+            </Button>
+            <Button
+              size="lg"
+              disabled={displayStock === 0 || addToCartWithVariant.isPending}
+              onClick={async () => {
+                await addToCartWithVariant.mutateAsync({ productId: product.id, variantId: selectedVariantId ?? undefined });
+                navigate({ to: "/_authenticated/checkout" });
+              }}
+              className="flex-1 rounded-full bg-accent-cyan font-bold uppercase tracking-tighter hover:bg-brand"
+            >
+              <ShoppingBag className="mr-2 size-4" /> Buy Now
             </Button>
             <Button
               size="lg"

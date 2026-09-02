@@ -1,5 +1,5 @@
 import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductGrid, type ProductCardData } from "@/components/product/ProductGrid";

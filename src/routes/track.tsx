@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { formatINR } from "@/lib/format";
-import { useState as useState2 } from "react";
 
 export const Route = createFileRoute("/track")({
   head: () => ({
