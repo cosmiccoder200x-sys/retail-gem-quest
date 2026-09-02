@@ -4,7 +4,7 @@ import { useCart, useRemoveFromCart, useUpdateCartQty } from "@/lib/cart";
 import { ProductTile } from "@/components/product/ProductTile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -75,7 +75,15 @@ function CartPage() {
                 <Link to="/products/$slug" params={{ slug: it.product.slug }} className="font-bold hover:text-accent-cyan">
                   {it.product.name}
                 </Link>
-                <p className="text-sm text-muted-foreground">{formatINR(it.product.price)} each</p>
+                {it.variant?.attributes && (
+                  <p className="text-xs text-muted-foreground">
+                    {Object.entries(it.variant.attributes as Record<string, { name?: string; value?: string }>)
+                      .filter(([, v]) => v?.value)
+                      .map(([, v]) => v!.value)
+                      .join(" · ")}
+                  </p>
+                )}
+                <p className="text-sm text-muted-foreground">{formatINR(it.variant?.price ?? it.product.price)} each</p>
                 <div className="mt-auto flex items-center justify-between">
                   <div className="inline-flex items-center rounded-full bg-background ring-1 ring-border">
                     <button

@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatINR } from "@/lib/format";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Banknote, ShieldCheck, Loader2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CreditCard, Banknote, ShieldCheck, Loader2, MapPin } from "lucide-react";
 
 type PaymentMethod = "cod" | "online";
 
@@ -78,6 +78,17 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const processingRef = useRef(false);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+
+  // Fetch saved addresses
+  const { data: savedAddresses } = useQuery({
+    queryKey: ["addresses", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase.from("addresses").select("*").order("is_default", { ascending: false });
+      return data ?? [];
+    },
+  });
 
   const subtotal = (items ?? []).reduce((n, i) => {
     const price = i.variant?.price ?? i.product.price;
@@ -273,6 +284,53 @@ function Checkout() {
           {/* Shipping Address */}
           <div className="rounded-3xl bg-white p-6 ring-1 ring-brand/5">
             <h2 className="font-display text-xl uppercase mb-4">Shipping Address</h2>
+
+            {/* Saved Addresses */}
+            {savedAddresses && savedAddresses.length > 0 && (
+              <div className="mb-4 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Saved Addresses</p>
+                {savedAddresses.map((addr) => (
+                  <label
+                    key={addr.id}
+                    className={`flex items-start gap-3 rounded-2xl border-2 p-3 cursor-pointer transition-colors ${
+                      selectedAddressId === addr.id
+                        ? "border-brand bg-brand-soft"
+                        : "border-border hover:border-brand/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="saved-address"
+                      checked={selectedAddressId === addr.id}
+                      onChange={() => {
+                        setSelectedAddressId(addr.id);
+                        setForm({
+                          full_name: addr.full_name,
+                          phone: addr.phone,
+                          line1: addr.line1,
+                          line2: addr.line2 ?? "",
+                          city: addr.city,
+                          state: addr.state,
+                          pincode: addr.pincode,
+                        });
+                      }}
+                      className="mt-1"
+                    />
+                    <div className="text-sm">
+                      <p className="font-bold">{addr.full_name} {addr.is_default && <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
+                      <p className="text-muted-foreground">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</p>
+                      <p className="text-muted-foreground">{addr.city}, {addr.state} - {addr.pincode}</p>
+                      <p className="text-muted-foreground">Phone: {addr.phone}</p>
+                    </div>
+                  </label>
+                ))}
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+                  <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-muted-foreground">or enter new address</span></div>
+                </div>
+              </div>
+            )}
+
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label>Full Name</Label>

@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag } from "lucide-react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductGrid, type ProductCardData } from "@/components/product/ProductGrid";
@@ -37,6 +38,9 @@ const productCols =
   "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, is_bestseller, is_featured";
 
 function Index() {
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
+
   const { data: featured } = useQuery({
     queryKey: ["home-featured"],
     queryFn: async () => {
@@ -93,11 +97,11 @@ function Index() {
             <Link to="/products" className="font-semibold text-brand">₹999 Store</Link>
           </nav>
 
-          <form onSubmit={(e) => { e.preventDefault(); }} className="relative hidden md:flex items-center gap-2">
+          <form onSubmit={(e) => { e.preventDefault(); if (searchQuery.trim()) navigate({ to: "/products", search: { q: searchQuery.trim() } }); }} className="relative hidden md:flex items-center gap-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              value="placeholderText"
-              onChange={() => {}}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search gadgets…"
               className="rounded-full pl-9"
             />
@@ -184,47 +188,16 @@ function Index() {
             subtitle="Explore gadgets by type"
           />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <Link
-              to="/products"
-              search={{ category: "kitchen" }}
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <Sparkles className="size-6 mb-2" /> Kitchen
-            </Link>
-            <Link
-              to="/products"
-              search={{ category: "home-comfort" }}
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <Truck className="size-6 mb-2" /> Home Comfort
-            </Link>
-            <Link
-              to="/products"
-              search={{ category: "personal-care" }}
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <Gift className="size-6 mb-2" /> Personal Care
-            </Link>
-            <Link
-              to="/products"
-              search={{ category: "cleaning" }}
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <Trash2 className="size-6 mb-2" /> Cleaning
-            </Link>
-            <Link
-              to="/products"
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <Heart className="size-6 mb-2" /> Gadgets
-            </Link>
-            <Link
-              to="/products"
-              search={{ sort: "newest" }}
-              className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
-            >
-              <RefreshCw className="size-6 mb-2" /> New
-            </Link>
+            {categories.map((cat) => (
+              <Link
+                key={cat.slug}
+                to="/products"
+                search={{ category: cat.slug }}
+                className="flex flex-col items-center rounded-2xl bg-card p-4 ring-1 ring-border transition hover:bg-brand hover:text-brand-foreground"
+              >
+                <Sparkles className="size-6 mb-2" /> {cat.name}
+              </Link>
+            ))}
           </div>
         </section>
       )}
