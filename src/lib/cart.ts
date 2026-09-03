@@ -40,9 +40,10 @@ function getProductSelect() {
   return "product:products(id, name, slug, price, mrp, image_url, stock)";
 }
 
-export function useCart(enabled: boolean) {
+export function useCart(userId?: string | null) {
+  const enabled = !!userId;
   return useQuery({
-    queryKey: ["cart"],
+    queryKey: ["cart", userId],
     enabled,
     queryFn: async (): Promise<CartItem[]> => {
       const { data, error } = await supabase
