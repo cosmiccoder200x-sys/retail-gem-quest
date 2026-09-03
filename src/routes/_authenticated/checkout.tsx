@@ -90,12 +90,49 @@ function Checkout() {
     },
   });
 
+  // Shipping config (server authoritative but preview-fetched)
+  const { data: shippingConfig } = useQuery({
+    queryKey: ["shipping-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("shipping_config").select("base_shipping_charge, free_shipping_threshold").eq("is_active", true).limit(1).maybeSingle();
+      return data ?? { base_shipping_charge: 79, free_shipping_threshold: 999 };
+    },
+  });
+
+  // Coupon state (preview via validate_coupon RPC)
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponBusy, setCouponBusy] = useState(false);
+
   const subtotal = (items ?? []).reduce((n, i) => {
     const price = i.variant?.price ?? i.product.price;
     return n + price * i.quantity;
   }, 0);
-  const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
-  const total = subtotal + shipping;
+  // Server-calculated preview: use config where available, fallback to legacy
+  const shipping = (() => {
+    if (subtotal === 0) return 0;
+    const base = Number(shippingConfig?.base_shipping_charge ?? 79);
+    const threshold = Number(shippingConfig?.free_shipping_threshold ?? 999);
+    return subtotal >= threshold ? 0 : base;
+  })();
+  const discount = appliedCoupon?.discount ?? 0;
+  const total = Math.max(0, subtotal + shipping - discount);
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) { setCouponError("Enter a coupon code"); return; }
+    setCouponBusy(true); setCouponError(null);
+    try {
+      const { data, error } = await supabase.rpc("validate_coupon", { p_code: code, p_user_id: user!.id, p_subtotal: subtotal } as any);
+      if (error) throw error;
+      const row = Array.isArray(data) ? data[0] : data as any;
+      if (!row || row.error) { setCouponError(row?.error ?? "Invalid coupon"); setAppliedCoupon(null); }
+      else { setAppliedCoupon({ code: row.coupon_code ?? code.toUpperCase(), discount: Number(row.discount) }); setCouponError(null); toast.success(`Coupon ${row.coupon_code} applied`); }
+    } catch (e: any) { setCouponError(e.message ?? "Failed to validate coupon"); }
+    finally { setCouponBusy(false); }
+  };
+  const removeCoupon = () => { setAppliedCoupon(null); setCouponInput(""); setCouponError(null); };
 
   const hasValidationErrors = validation?.some((v: { is_valid: boolean }) => !v.is_valid);
   const validationError = validation?.find(
@@ -245,7 +282,7 @@ function Checkout() {
         p_items: orderItems,
         p_shipping_address: parsed.data,
         p_payment_method: paymentMethod === "online" ? "online" : "cod",
-        p_coupon_code: null,
+        p_coupon_code: appliedCoupon?.code ?? null,
         p_customer_email: user!.email!,
       });
 
@@ -442,6 +479,23 @@ function Checkout() {
         {/* Order Summary */}
         <aside className="rounded-3xl bg-white p-6 ring-1 ring-brand/5 h-fit sm:sticky sm:top-24">
           <h3 className="font-display text-xl uppercase">Summary</h3>
+          {/* Coupon */}
+          <div className="rounded-2xl border border-border p-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Coupon</p>
+            {!appliedCoupon ? (
+              <div className="flex gap-2">
+                <Input placeholder="Coupon code" value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} className="h-9 text-sm" />
+                <Button type="button" variant="outline" onClick={applyCoupon} disabled={couponBusy} className="h-9 rounded-full shrink-0">{couponBusy ? "..." : "Apply"}</Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl bg-success/10 px-3 py-2">
+                <span className="text-sm font-bold">{appliedCoupon.code} <span className="font-normal text-success">- {formatINR(appliedCoupon.discount)}</span></span>
+                <Button type="button" variant="ghost" size="sm" onClick={removeCoupon} className="h-7 text-xs">Remove</Button>
+              </div>
+            )}
+            {couponError && <p className="mt-2 text-xs text-destructive">{couponError}</p>}
+          </div>
+
           <div className="space-y-2 text-sm">
             {(items ?? []).map((i) => {
               const price = i.variant?.price ?? i.product.price;
@@ -461,6 +515,12 @@ function Checkout() {
               <span>Subtotal</span>
               <span>{formatINR(subtotal)}</span>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-success">
+                <span>Coupon {appliedCoupon?.code ? `(${appliedCoupon.code})` : ""}</span>
+                <span>-{formatINR(discount)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Shipping</span>
               <span>{shipping === 0 ? "Free" : formatINR(shipping)}</span>
@@ -469,6 +529,7 @@ function Checkout() {
               <span>Total</span>
               <span>{formatINR(total)}</span>
             </div>
+            <p className="text-[11px] text-muted-foreground">Final total is calculated securely on the server. Coupon and shipping are verified at checkout.</p>
           </div>
           <Button
             type="submit"

@@ -36,17 +36,21 @@ function Admin() {
     <div className="mx-auto max-w-7xl px-6 py-12">
       <h1 className="mb-8 font-display text-4xl uppercase">Merchant Hub</h1>
       <Tabs defaultValue="orders">
-        <TabsList>
+        <TabsList className="flex flex-wrap">
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <TabsTrigger value="coupons">Coupons</TabsTrigger>
+          <TabsTrigger value="shipping">Shipping</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><AdminOrders /></TabsContent>
         <TabsContent value="products"><AdminProducts /></TabsContent>
         <TabsContent value="categories"><AdminCategories /></TabsContent>
         <TabsContent value="reviews"><AdminReviews /></TabsContent>
+        <TabsContent value="coupons"><AdminCoupons /></TabsContent>
+        <TabsContent value="shipping"><AdminShipping /></TabsContent>
         <TabsContent value="suppliers"><AdminSuppliers /></TabsContent>
       </Tabs>
     </div>
@@ -292,6 +296,7 @@ function OrderRow({
             {suppliers.find((s) => s.id === order.supplier_id)?.name ?? String(order.supplier_id).slice(0, 6)}
           </span>
         )}
+        <span className="text-xs text-muted-foreground">Sub {formatINR(Number(order.subtotal ?? 0))} · Disc {formatINR(Number(order.discount_amount ?? 0))}{order.coupon_code?` (${order.coupon_code})`:""} · Ship {formatINR(Number(order.shipping ?? 0))}</span>
         <div className="ml-auto flex items-center gap-2">
           <Select
             value={String(order.status)}
@@ -707,6 +712,141 @@ function AdminReviews() {
           <p className="mt-2 text-sm leading-relaxed break-words">{r.review_text}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function AdminCoupons() {
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ code: "", description: "", discount_type: "percent" as "percent"|"flat", discount_value: 10, maximum_discount: "", min_order_total: "", max_uses: "", per_user_limit: "", starts_at: "", expires_at: "", is_active: true });
+
+  const { data: coupons } = useQuery({
+    queryKey: ["admin-coupons", filter],
+    queryFn: async () => {
+      const { data } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
+      let rows = data ?? [];
+      const now = new Date();
+      if (filter === "active") rows = rows.filter((c: any) => c.is_active && (!c.expires_at || new Date(c.expires_at) > now) && (!c.starts_at || new Date(c.starts_at) <= now));
+      else if (filter === "expired") rows = rows.filter((c: any) => c.expires_at && new Date(c.expires_at) <= now);
+      else if (filter === "upcoming") rows = rows.filter((c: any) => c.starts_at && new Date(c.starts_at) > now);
+      else if (filter === "disabled") rows = rows.filter((c: any) => !c.is_active);
+      return rows;
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!draft.code.trim()) throw new Error("Code required");
+      const payload: any = {
+        code: draft.code.trim().toUpperCase(),
+        description: draft.description.trim() || null,
+        discount_type: draft.discount_type,
+        discount_value: Number(draft.discount_value),
+        maximum_discount: draft.maximum_discount ? Number(draft.maximum_discount) : null,
+        min_order_total: draft.min_order_total ? Number(draft.min_order_total) : 0,
+        max_uses: draft.max_uses ? Number(draft.max_uses) : null,
+        per_user_limit: draft.per_user_limit ? Number(draft.per_user_limit) : null,
+        starts_at: draft.starts_at ? new Date(draft.starts_at).toISOString() : null,
+        expires_at: draft.expires_at ? new Date(draft.expires_at).toISOString() : null,
+        is_active: draft.is_active,
+      };
+      if (editing === "new") { const { error } = await supabase.from("coupons").insert(payload); if (error) throw error; }
+      else { const { error } = await supabase.from("coupons").update(payload).eq("id", editing); if (error) throw error; }
+    },
+    onSuccess: () => { toast.success(editing === "new" ? "Coupon created" : "Coupon updated"); setEditing(null); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => { const { error } = await supabase.from("coupons").delete().eq("id", id); if (error) throw error; },
+    onSuccess: () => { toast.success("Coupon deleted"); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); },
+  });
+  const toggleActive = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => { const { error } = await supabase.from("coupons").update({ is_active }).eq("id", id); if (error) throw error; },
+    onSuccess: () => { toast.success("Updated"); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); },
+  });
+
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {[
+          ["all","All"],["active","Active"],["expired","Expired"],["upcoming","Upcoming"],["disabled","Disabled"]
+        ].map(([v,l]) => (
+          <Button key={v} size="sm" variant={filter===v?"default":"outline"} onClick={()=>setFilter(v)} className="rounded-full text-xs">{l}</Button>
+        ))}
+        <Button onClick={()=>{ setEditing("new"); setDraft({ code:"", description:"", discount_type:"percent", discount_value:10, maximum_discount:"", min_order_total:"", max_uses:"", per_user_limit:"", starts_at:"", expires_at:"", is_active:true }); }} className="rounded-full ml-auto">+ New Coupon</Button>
+      </div>
+      {editing && (
+        <div className="space-y-3 rounded-3xl bg-white p-6 ring-1 ring-border">
+          <h3 className="font-display text-xl uppercase">{editing==="new"?"Add Coupon":"Edit Coupon"}</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div><Label>Code *</Label><Input value={draft.code} onChange={(e)=>setDraft({...draft, code:e.target.value.toUpperCase()})} placeholder="WELCOME10" /></div>
+            <div><Label>Type</Label><Select value={draft.discount_type} onValueChange={(v)=>setDraft({...draft, discount_type: v as any})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="percent">Percent %</SelectItem><SelectItem value="flat">Flat ₹</SelectItem></SelectContent></Select></div>
+            <div><Label>Value *</Label><Input type="number" value={draft.discount_value} onChange={(e)=>setDraft({...draft, discount_value: Number(e.target.value)})} /></div>
+            <div><Label>Max discount (for %)</Label><Input type="number" value={draft.maximum_discount} onChange={(e)=>setDraft({...draft, maximum_discount:e.target.value})} placeholder="e.g. 500" /></div>
+            <div><Label>Min order ₹</Label><Input type="number" value={draft.min_order_total} onChange={(e)=>setDraft({...draft, min_order_total:e.target.value})} /></div>
+            <div><Label>Max uses (total)</Label><Input type="number" value={draft.max_uses} onChange={(e)=>setDraft({...draft, max_uses:e.target.value})} /></div>
+            <div><Label>Per user limit</Label><Input type="number" value={draft.per_user_limit} onChange={(e)=>setDraft({...draft, per_user_limit:e.target.value})} /></div>
+            <div><Label>Starts at</Label><Input type="datetime-local" value={draft.starts_at} onChange={(e)=>setDraft({...draft, starts_at:e.target.value})} /></div>
+            <div className="sm:col-span-2"><Label>Expires at</Label><Input type="datetime-local" value={draft.expires_at} onChange={(e)=>setDraft({...draft, expires_at:e.target.value})} /></div>
+            <div className="sm:col-span-2"><Label>Description</Label><Input value={draft.description} onChange={(e)=>setDraft({...draft, description:e.target.value})} placeholder="10% off for new customers" /></div>
+          </div>
+          <div className="flex items-center gap-2"><Switch checked={draft.is_active} onCheckedChange={(v)=>setDraft({...draft, is_active:v})} /><Label>Active</Label></div>
+          <div className="flex gap-2"><Button onClick={()=>save.mutate()} disabled={save.isPending}>Save</Button><Button variant="ghost" onClick={()=>setEditing(null)}>Cancel</Button></div>
+        </div>
+      )}
+      <div className="rounded-3xl bg-white ring-1 ring-border">
+        {(coupons ?? []).length===0 && <p className="p-6 text-sm text-muted-foreground">No coupons.</p>}
+        {(coupons ?? []).map((c:any)=>(
+          <div key={c.id} className="flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0">
+            <div className="min-w-0 flex-1">
+              <p className="font-mono font-bold">{c.code} <span className="text-xs font-normal text-muted-foreground">{c.discount_type==="percent"?`${c.discount_value}%`:`₹${c.discount_value}`}{c.maximum_discount?` (max ₹${c.maximum_discount})`:""}</span> {!c.is_active && <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded-full">Disabled</span>}</p>
+              <p className="text-xs text-muted-foreground">Min ₹{c.min_order_total ?? 0} · Used {c.used_count}/{c.max_uses ?? "∞"} · Per user {c.per_user_limit ?? "∞"} {c.expires_at?`· Exp ${new Date(c.expires_at).toLocaleDateString()}`:""}</p>
+              {c.description && <p className="text-xs text-muted-foreground truncate">{c.description}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={c.is_active} onCheckedChange={(v)=>toggleActive.mutate({ id:c.id, is_active:v })} />
+              <Button size="sm" variant="outline" onClick={()=>{ setEditing(c.id); setDraft({ code:c.code, description:c.description??"", discount_type:c.discount_type, discount_value:Number(c.discount_value), maximum_discount:c.maximum_discount?String(c.maximum_discount):"", min_order_total:c.min_order_total?String(c.min_order_total):"", max_uses:c.max_uses?String(c.max_uses):"", per_user_limit:c.per_user_limit?String(c.per_user_limit):"", starts_at:c.starts_at?new Date(c.starts_at).toISOString().slice(0,16):"", expires_at:c.expires_at?new Date(c.expires_at).toISOString().slice(0,16):"", is_active:c.is_active }); }}>Edit</Button>
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={()=>remove.mutate(c.id)}>Delete</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdminShipping() {
+  const qc = useQueryClient();
+  const { data: cfg, isPending } = useQuery({
+    queryKey: ["admin-shipping-config"],
+    queryFn: async () => {
+      const { data } = await supabase.from("shipping_config").select("*").eq("is_active", true).limit(1).maybeSingle();
+      return data;
+    },
+  });
+  const [draft, setDraft] = useState({ base_shipping_charge: 79, free_shipping_threshold: 999, cod_min_order_value: 0 });
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  if (cfg && loadedId !== cfg.id) { setDraft({ base_shipping_charge: Number(cfg.base_shipping_charge), free_shipping_threshold: Number(cfg.free_shipping_threshold), cod_min_order_value: Number(cfg.cod_min_order_value ?? 0) }); setLoadedId(cfg.id); }
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!cfg) throw new Error("No config");
+      const { error } = await supabase.from("shipping_config").update({ base_shipping_charge: draft.base_shipping_charge, free_shipping_threshold: draft.free_shipping_threshold, cod_min_order_value: draft.cod_min_order_value }).eq("id", cfg.id);
+      if (error) throw error;
+    },
+    onSuccess: () => { toast.success("Shipping config saved"); qc.invalidateQueries({ queryKey: ["admin-shipping-config"] }); qc.invalidateQueries({ queryKey: ["shipping-config"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (isPending) return <p className="mt-6 text-sm text-muted-foreground">Loading…</p>;
+  return (
+    <div className="mt-6 max-w-lg space-y-4 rounded-3xl bg-white p-6 ring-1 ring-border">
+      <h3 className="font-display text-xl uppercase">Shipping Config</h3>
+      <div><Label>Base shipping charge ₹</Label><Input type="number" value={draft.base_shipping_charge} onChange={(e)=>setDraft({...draft, base_shipping_charge: Number(e.target.value)})} /></div>
+      <div><Label>Free shipping threshold ₹</Label><Input type="number" value={draft.free_shipping_threshold} onChange={(e)=>setDraft({...draft, free_shipping_threshold: Number(e.target.value)})} /><p className="text-xs text-muted-foreground mt-1">Orders at or above this subtotal ship free.</p></div>
+      <div><Label>COD min order ₹ (optional)</Label><Input type="number" value={draft.cod_min_order_value} onChange={(e)=>setDraft({...draft, cod_min_order_value: Number(e.target.value)})} /></div>
+      <div className="rounded-xl bg-muted p-3 text-xs">Preview: Subtotal ₹500 → Shipping {500 >= draft.free_shipping_threshold ? "Free" : formatINR(draft.base_shipping_charge)} · Subtotal ₹{draft.free_shipping_threshold} → Free</div>
+      <Button onClick={()=>save.mutate()} disabled={save.isPending}>Save</Button>
     </div>
   );
 }

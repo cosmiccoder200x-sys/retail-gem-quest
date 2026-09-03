@@ -3,10 +3,8 @@ import { useAuth } from "@/lib/auth-store";
 import { useCart, useRemoveFromCart, useUpdateCartQty } from "@/lib/cart";
 import { ProductTile } from "@/components/product/ProductTile";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { formatINR } from "@/lib/format";
-import { useState } from "react";
 import { EmptyState } from "@/components/common/EmptyState";
 
 export const Route = createFileRoute("/cart")({
@@ -19,8 +17,6 @@ function CartPage() {
   const { data: items } = useCart(!!user);
   const update = useUpdateCartQty();
   const remove = useRemoveFromCart();
-  const [coupon, setCoupon] = useState("");
-  const [discount, setDiscount] = useState(0);
 
   if (loading) {
     return (
@@ -67,14 +63,9 @@ function CartPage() {
     const price = i.variant?.price ?? i.product.price;
     return n + price * i.quantity;
   }, 0);
+  // Cart shows subtotal + shipping preview; coupon is applied at checkout
   const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
-  const total = subtotal - discount + shipping;
-
-  const applyCoupon = () => {
-    if (coupon.toUpperCase() === "GULLY10") setDiscount(Math.round(subtotal * 0.1));
-    else if (coupon.toUpperCase() === "NEW50") setDiscount(50);
-    else setDiscount(0);
-  };
+  const total = subtotal + shipping;
 
   if (!items || items.length === 0) {
     return (
@@ -147,20 +138,9 @@ function CartPage() {
           <h3 className="font-display text-xl uppercase">Order Summary</h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-            {discount > 0 && (
-              <div className="flex justify-between text-success">
-                <span>Discount</span>
-                <span>− {formatINR(discount)}</span>
-              </div>
-            )}
             <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
-            <div className="flex justify-between font-display text-2xl"><span>Total</span><span>{formatINR(total)}</span></div>
-          </div>
-          <div className="border-t border-border pt-4">
-            <div className="flex justify-between font-display text-xl">
-              <span>Total</span>
-              <span>{formatINR(total)}</span>
-            </div>
+            <div className="flex justify-between font-display text-xl border-t border-border pt-2"><span>Total</span><span>{formatINR(total)}</span></div>
+            <p className="text-xs text-muted-foreground">Coupon can be applied at checkout.</p>
           </div>
           <Button asChild size="lg" className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
             <Link to="/checkout">Checkout</Link>
