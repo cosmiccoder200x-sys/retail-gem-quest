@@ -12,6 +12,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/format";
 import { toast } from "sonner";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { AdminInventory } from "@/components/admin/AdminInventory";
+import { AdminCustomers } from "@/components/admin/AdminCustomers";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Admin — GullyGadget" }] }),
@@ -35,18 +39,26 @@ function Admin() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
       <h1 className="mb-8 font-display text-4xl uppercase">Merchant Hub</h1>
-      <Tabs defaultValue="orders">
+      <Tabs defaultValue="dashboard">
         <TabsList className="flex flex-wrap">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="customers">Customers</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="coupons">Coupons</TabsTrigger>
           <TabsTrigger value="shipping">Shipping</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
+        <TabsContent value="dashboard"><AdminDashboard /></TabsContent>
+        <TabsContent value="analytics"><AdminAnalytics /></TabsContent>
         <TabsContent value="orders"><AdminOrders /></TabsContent>
         <TabsContent value="products"><AdminProducts /></TabsContent>
+        <TabsContent value="inventory"><AdminInventory /></TabsContent>
+        <TabsContent value="customers"><AdminCustomers /></TabsContent>
         <TabsContent value="categories"><AdminCategories /></TabsContent>
         <TabsContent value="reviews"><AdminReviews /></TabsContent>
         <TabsContent value="coupons"><AdminCoupons /></TabsContent>
@@ -90,7 +102,7 @@ function AdminOrders() {
       else if (filter === "ful-delivered") q = q.eq("fulfillment_status", "delivered");
       else if (filter !== "all") q = q.eq("status", filter);
 
-      if (search) q = q.ilike("order_number", `%${search}%`);
+      if (search) q = q.or(`order_number.ilike.%${search}%,customer_email.ilike.%${search}%`);
 
       const { data } = await q.limit(100);
       return data ?? [];
@@ -186,7 +198,7 @@ function AdminOrders() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Search order number…"
+          placeholder="Search order # or customer…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-48"
@@ -411,7 +423,20 @@ function OrderRow({
 }
 
 function AdminProducts() {
-  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("all");
+  const [stockFilter, setStockFilter] = useState("all");
+  const [published, setPublished] = useState("all");
+  const [sort, setSort] = useState("newest");
+
+  const { data: categories } = useQuery({
+    queryKey: ["admin-categories-list"],
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("id, name, slug").order("sort_order");
+      return data ?? [];
+    },
+  });
+
   const { data: products } = useQuery({
     queryKey: ["admin-products"],
     queryFn: async () => {
@@ -420,7 +445,43 @@ function AdminProducts() {
     },
   });
 
+  const { data: salesMap } = useQuery({
+    queryKey: ["product-performance"],
+    queryFn: async () => {
+      const { data } = await supabase.from("order_items").select("product_id, quantity, unit_price, order_id");
+      const map = new Map<string, { units: number; revenue: number; orders: Set<string> }>();
+      for (const r of data ?? []) {
+        const cur = map.get(r.product_id) ?? { units: 0, revenue: 0, orders: new Set<string>() };
+        cur.units += r.quantity;
+        cur.revenue += Number(r.unit_price) * r.quantity;
+        cur.orders.add(r.order_id);
+        map.set(r.product_id, cur);
+      }
+      return map;
+    },
+  });
+
   const lowStock = (products ?? []).filter((p) => p.is_active !== false && p.stock <= 5);
+
+  const filtered = (() => {
+    let list = [...(products ?? [])];
+    if (search.trim()) {
+      const term = search.trim().toLowerCase();
+      list = list.filter((p) => p.name.toLowerCase().includes(term) || p.slug.toLowerCase().includes(term) || (p.sku ?? "").toLowerCase().includes(term));
+    }
+    if (category !== "all") list = list.filter((p) => p.category_id === category);
+    if (stockFilter === "low") list = list.filter((p) => p.stock > 0 && p.stock <= 5);
+    else if (stockFilter === "out") list = list.filter((p) => p.stock === 0);
+    else if (stockFilter === "in") list = list.filter((p) => p.stock > 5);
+    if (published === "published") list = list.filter((p) => p.is_active);
+    else if (published === "unpublished") list = list.filter((p) => !p.is_active);
+    // Sorting
+    if (sort === "units") list.sort((a, b) => (salesMap?.get(b.id)?.units ?? 0) - (salesMap?.get(a.id)?.units ?? 0));
+    else if (sort === "revenue") list.sort((a, b) => (salesMap?.get(b.id)?.revenue ?? 0) - (salesMap?.get(a.id)?.revenue ?? 0));
+    else if (sort === "stock") list.sort((a, b) => a.stock - b.stock);
+    else list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  })();
 
   return (
     <div className="mt-6 space-y-4">
@@ -438,25 +499,41 @@ function AdminProducts() {
           </ul>
         </div>
       )}
-      <div className="rounded-3xl bg-white ring-1 ring-border">
-        {(products ?? []).map((p) => {
-          const isLow = p.is_active !== false && p.stock <= 5;
-          const isOut = p.stock === 0;
-          return (
-            <div
-              key={p.id}
-              className={`flex items-center gap-4 border-b border-border p-4 last:border-0 ${p.is_active === false ? "opacity-50" : ""} ${isLow ? "bg-amber-50/50" : ""}`}
-            >
-              <img src={p.images?.[0]?.url || p.image_url} alt={p.name} className="w-14 h-14 rounded-xl object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-bold truncate">{p.name} {isOut ? <span className="ml-1 text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded-full">Out</span> : isLow ? <span className="ml-1 text-xs bg-amber-500 text-white px-2 py-0.5 rounded-full">{p.stock} left</span> : null}</p>
-                <p className="text-xs text-muted-foreground">{p.slug} · Stock: {p.stock}</p>
-              </div>
-              <span className="font-display italic shrink-0">{formatINR(Number(p.price))}</span>
-            </div>
-          );
-        })}
+
+      <div className="flex flex-wrap gap-2">
+        <Input placeholder="Search name/sku…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-48" />
+        <Select value={category} onValueChange={setCategory}><SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{(categories ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>
+        <Select value={stockFilter} onValueChange={setStockFilter}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All stock</SelectItem><SelectItem value="in">In Stock</SelectItem><SelectItem value="low">Low Stock</SelectItem><SelectItem value="out">Out of Stock</SelectItem></SelectContent></Select>
+        <Select value={published} onValueChange={setPublished}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem><SelectItem value="published">Published</SelectItem><SelectItem value="unpublished">Unpublished</SelectItem></SelectContent></Select>
+        <Select value={sort} onValueChange={setSort}><SelectTrigger className="w-36"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="newest">Newest</SelectItem><SelectItem value="units">Units sold</SelectItem><SelectItem value="revenue">Revenue</SelectItem><SelectItem value="stock">Stock</SelectItem></SelectContent></Select>
       </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl bg-white p-8 text-center ring-1 ring-border"><p className="text-sm text-muted-foreground">No products match filters.</p></div>
+      ) : (
+        <div className="overflow-x-auto rounded-3xl bg-white ring-1 ring-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs uppercase tracking-widest text-muted-foreground"><tr><th className="p-3 text-left">Product</th><th className="p-3">Stock</th><th className="p-3">Sold</th><th className="p-3">Revenue</th><th className="p-3">Orders</th><th className="p-3">Status</th></tr></thead>
+            <tbody>
+              {filtered.map((p) => {
+                const isLow = p.is_active !== false && p.stock <= 5;
+                const isOut = p.stock === 0;
+                const perf = salesMap?.get(p.id);
+                return (
+                  <tr key={p.id} className={`border-t border-border ${p.is_active === false ? "opacity-50" : ""} ${isLow ? "bg-amber-50/30" : ""}`}>
+                    <td className="p-3"><div className="flex items-center gap-2"><img src={p.images?.[0]?.url || p.image_url} alt={p.name} className="w-10 h-10 rounded-lg object-cover shrink-0" /><div><p className="font-medium truncate max-w-[180px]">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {formatINR(Number(p.price))}</p></div></div></td>
+                    <td className="p-3 text-center">{p.stock} {isOut ? <span className="ml-1 text-xs bg-destructive text-destructive-foreground px-1.5 py-0.5 rounded-full">Out</span> : isLow ? <span className="ml-1 text-xs bg-amber-500 text-white px-1.5 py-0.5 rounded-full">Low</span> : null}</td>
+                    <td className="p-3 text-center">{perf?.units ?? 0}</td>
+                    <td className="p-3 text-center">{formatINR(perf?.revenue ?? 0)}</td>
+                    <td className="p-3 text-center">{perf?.orders.size ?? 0}</td>
+                    <td className="p-3 text-center text-xs">{p.is_active ? "Published" : "Unpublished"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -736,6 +813,21 @@ function AdminCoupons() {
     },
   });
 
+  const { data: couponStats } = useQuery({
+    queryKey: ["coupon-stats"],
+    queryFn: async () => {
+      const { data } = await supabase.from("orders").select("coupon_code, discount_amount").not("coupon_code", "is", null).neq("status", "cancelled").limit(2000);
+      const map = new Map<string, { uses: number; discount: number }>();
+      for (const r of data ?? []) {
+        const cur = map.get(r.coupon_code) ?? { uses: 0, discount: 0 };
+        cur.uses += 1;
+        cur.discount += Number(r.discount_amount ?? 0);
+        map.set(r.coupon_code, cur);
+      }
+      return map;
+    },
+  });
+
   const save = useMutation({
     mutationFn: async () => {
       if (!draft.code.trim()) throw new Error("Code required");
@@ -755,12 +847,12 @@ function AdminCoupons() {
       if (editing === "new") { const { error } = await supabase.from("coupons").insert(payload); if (error) throw error; }
       else { const { error } = await supabase.from("coupons").update(payload).eq("id", editing); if (error) throw error; }
     },
-    onSuccess: () => { toast.success(editing === "new" ? "Coupon created" : "Coupon updated"); setEditing(null); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); },
+    onSuccess: () => { toast.success(editing === "new" ? "Coupon created" : "Coupon updated"); setEditing(null); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); qc.invalidateQueries({ queryKey: ["coupon-stats"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => { const { error } = await supabase.from("coupons").delete().eq("id", id); if (error) throw error; },
-    onSuccess: () => { toast.success("Coupon deleted"); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); },
+    onSuccess: () => { toast.success("Coupon deleted"); qc.invalidateQueries({ queryKey: ["admin-coupons"] }); qc.invalidateQueries({ queryKey: ["coupon-stats"] }); },
   });
   const toggleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => { const { error } = await supabase.from("coupons").update({ is_active }).eq("id", id); if (error) throw error; },
@@ -802,7 +894,7 @@ function AdminCoupons() {
           <div key={c.id} className="flex flex-wrap items-center gap-3 border-b border-border p-4 last:border-0">
             <div className="min-w-0 flex-1">
               <p className="font-mono font-bold">{c.code} <span className="text-xs font-normal text-muted-foreground">{c.discount_type==="percent"?`${c.discount_value}%`:`₹${c.discount_value}`}{c.maximum_discount?` (max ₹${c.maximum_discount})`:""}</span> {!c.is_active && <span className="ml-2 text-xs bg-muted px-2 py-0.5 rounded-full">Disabled</span>}</p>
-              <p className="text-xs text-muted-foreground">Min ₹{c.min_order_total ?? 0} · Used {c.used_count}/{c.max_uses ?? "∞"} · Per user {c.per_user_limit ?? "∞"} {c.expires_at?`· Exp ${new Date(c.expires_at).toLocaleDateString()}`:""}</p>
+              <p className="text-xs text-muted-foreground">Min ₹{c.min_order_total ?? 0} · Used {c.used_count}/{c.max_uses ?? "∞"} · Per user {c.per_user_limit ?? "∞"} · Discount {formatINR(couponStats?.get(c.code)?.discount ?? 0)} {c.expires_at?`· Exp ${new Date(c.expires_at).toLocaleDateString()}`:""}</p>
               {c.description && <p className="text-xs text-muted-foreground truncate">{c.description}</p>}
             </div>
             <div className="flex items-center gap-2">
