@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 import { formatINR } from "@/lib/format";
 import { EmptyState } from "@/components/common/EmptyState";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Your Cart — GullyGadget" }] }),
@@ -63,8 +65,19 @@ function CartPage() {
     const price = i.variant?.price ?? i.product.price;
     return n + price * i.quantity;
   }, 0);
-  // Cart shows subtotal + shipping preview; coupon is applied at checkout
-  const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
+  const { data: shippingCfg } = useQuery({
+    queryKey: ["shipping-config-cart"],
+    queryFn: async () => {
+      const { data } = await supabase.from("shipping_config").select("base_shipping_charge, free_shipping_threshold").eq("is_active", true).limit(1).maybeSingle();
+      return data ?? { base_shipping_charge: 79, free_shipping_threshold: 999 };
+    },
+  });
+  const shipping = (() => {
+    if (subtotal === 0) return 0;
+    const base = Number(shippingCfg?.base_shipping_charge ?? 79);
+    const threshold = Number(shippingCfg?.free_shipping_threshold ?? 999);
+    return subtotal >= threshold ? 0 : base;
+  })();
   const total = subtotal + shipping;
 
   if (!items || items.length === 0) {
