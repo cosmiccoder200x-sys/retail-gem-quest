@@ -297,8 +297,13 @@ function Account() {
                   <OrderTimeline
                     createdAt={o.created_at}
                     forwardedAt={o.forwarded_at}
+                    shippedAt={o.shipped_at}
+                    deliveredAt={o.delivered_at}
+                    expectedDeliveryDate={o.expected_delivery_date}
                     fulfillmentStatus={o.fulfillment_status}
                     forwardingStatus={o.forwarding_status}
+                    orderStatus={o.status}
+                    paymentStatus={o.payment_status}
                     hasTracking={hasTracking}
                     carrier={o.tracking_carrier}
                     trackingNumber={o.tracking_number}

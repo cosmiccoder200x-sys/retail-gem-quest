@@ -42,6 +42,9 @@ type LookupRow = {
   payment_status: string | null;
   payment_method: string | null;
   customer_email: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
+  expected_delivery_date: string | null;
 };
 
 function isUuid(v: string): boolean {
@@ -136,8 +139,14 @@ function TrackPage() {
 
           <OrderTimeline
             createdAt={result.created_at}
+            forwardedAt={result.forwarding_status === "forwarded" ? result.created_at : null}
+            shippedAt={result.shipped_at}
+            deliveredAt={result.delivered_at}
+            expectedDeliveryDate={result.expected_delivery_date}
             fulfillmentStatus={result.fulfillment_status}
             forwardingStatus={result.forwarding_status}
+            orderStatus={result.status}
+            paymentStatus={result.payment_status}
             hasTracking={!!result.tracking_number}
             carrier={result.tracking_carrier}
             trackingNumber={result.tracking_number}

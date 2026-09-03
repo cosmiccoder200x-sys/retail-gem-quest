@@ -86,8 +86,13 @@ function OrderConfirmation() {
         <OrderTimeline
           createdAt={order.created_at}
           forwardedAt={order.forwarded_at}
+          shippedAt={order.shipped_at}
+          deliveredAt={order.delivered_at}
+          expectedDeliveryDate={order.expected_delivery_date}
           fulfillmentStatus={order.fulfillment_status}
           forwardingStatus={order.forwarding_status}
+          orderStatus={order.status}
+          paymentStatus={order.payment_status}
           hasTracking={hasTracking}
           carrier={order.tracking_carrier}
           trackingNumber={order.tracking_number}

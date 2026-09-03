@@ -146,26 +146,35 @@ function AdminOrders() {
     mutationFn: async () => {
       const ids = Array.from(selected);
       if (ids.length === 0) throw new Error("No orders selected");
-      // Only forward pending forwarding_status
       const pendingIds = ids.filter((id) => {
         const o = orders?.find((x) => x.id === id);
         return o?.forwarding_status === "pending";
       });
       if (pendingIds.length === 0) throw new Error("No pending orders selected");
+      const results: { id: string; ok: boolean; error?: string }[] = [];
       for (const id of pendingIds) {
         const order = orders?.find((o) => o.id === id);
+        if (order?.forwarding_status !== "pending") {
+          results.push({ id, ok: false, error: "Already forwarded" });
+          continue;
+        }
         const patch: Record<string, unknown> = {
           forwarding_status: "forwarded",
           forwarded_at: new Date().toISOString(),
           fulfillment_status: "processing",
+          forwarding_failure_reason: null,
         };
         if (order?.status === "pending") patch.status = "confirmed";
         const { error } = await supabase.from("orders").update(patch as never).eq("id", id);
-        if (error) throw error;
+        results.push({ id, ok: !error, error: error?.message });
       }
+      const ok = results.filter((r) => r.ok).length;
+      const fail = results.filter((r) => !r.ok).length;
+      if (fail > 0) throw new Error(`Bulk: ${ok} forwarded, ${fail} failed. ${results.filter((r) => !r.ok).map((r) => r.error).join("; ")}`);
+      return ok;
     },
-    onSuccess: () => {
-      toast.success("Bulk forwarded");
+    onSuccess: (ok) => {
+      toast.success(`Bulk forwarded ${ok} order(s)`);
       setSelected(new Set());
       qc.invalidateQueries({ queryKey: ["admin-orders"] });
     },
@@ -253,6 +262,11 @@ function AdminOrders() {
   );
 }
 
+function isValidTrackingUrl(url: string) {
+  if (!url) return true;
+  return /^https?:\/\/[^\s]+$/i.test(url);
+}
+
 function OrderRow({
   order,
   suppliers,
@@ -272,8 +286,28 @@ function OrderRow({
   const [number, setNumber] = useState((order.tracking_number as string) ?? "");
   const [url, setUrl] = useState((order.tracking_url as string) ?? "");
   const [supplierId, setSupplierId] = useState((order.supplier_id as string) ?? "");
+  const [expectedDelivery, setExpectedDelivery] = useState((order.expected_delivery_date as string) ?? "");
+  const [failureReason, setFailureReason] = useState((order.forwarding_failure_reason as string) ?? "");
+  const [showHistory, setShowHistory] = useState(false);
   const isPaidOrCod = order.payment_status === "paid" || order.payment_method === "cod";
   const canForward = order.forwarding_status === "pending" && isPaidOrCod && order.status !== "cancelled";
+
+  const { data: history } = useQuery({
+    queryKey: ["order-history", order.id],
+    enabled: showHistory,
+    queryFn: async () => {
+      const { data } = await supabase.from("order_status_history").select("*").eq("order_id", order.id).order("created_at", { ascending: false }).limit(20);
+      return data ?? [];
+    },
+  });
+  const { data: notifications } = useQuery({
+    queryKey: ["order-notifications", order.id],
+    enabled: showHistory,
+    queryFn: async () => {
+      const { data } = await supabase.from("order_notifications").select("event, status, error, created_at").eq("order_id", order.id).order("created_at", { ascending: false }).limit(20);
+      return data ?? [];
+    },
+  });
 
   return (
     <div className="rounded-3xl bg-white p-4 ring-1 ring-border">
@@ -363,19 +397,30 @@ function OrderRow({
         ) : !isPaidOrCod ? (
           <span className="text-xs text-muted-foreground">Awaiting payment</span>
         ) : null}
-        {!canForward && order.forwarding_status === "pending" && isPaidOrCod && (
-          <Button size="sm" variant="outline" className="rounded-full" onClick={() => onForward(supplierId || undefined)}>
-            Mark forwarded
-          </Button>
+        {order.forwarding_status === "failed" && (
+          <span className="text-xs text-destructive">Failed{order.forwarding_failure_reason ? `: ${String(order.forwarding_failure_reason)}` : ""}</span>
         )}
       </div>
+      {order.forwarding_status === "failed" && (
+        <div className="mt-2 flex gap-2">
+          <Input placeholder="Failure reason" value={failureReason} onChange={(e) => setFailureReason(e.target.value)} className="flex-1" />
+          <Button size="sm" variant="outline" onClick={() => onSave({ forwarding_failure_reason: failureReason || null })}>Save reason</Button>
+          <Button size="sm" onClick={() => onForward(supplierId || undefined)}>Retry</Button>
+        </div>
+      )}
 
       {/* Fulfillment status */}
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground">Fulfillment:</span>
         <Select
           value={String(order.fulfillment_status ?? "pending")}
-          onValueChange={(v) => onSave({ fulfillment_status: v })}
+          onValueChange={(v) => {
+            if (v === "cancelled" && !confirm("Cancel this order? This will stop fulfillment.")) return;
+            if (v === "delivered" && !order.tracking_number) {
+              if (!confirm("Mark delivered without tracking?")) return;
+            }
+            onSave({ fulfillment_status: v });
+          }}
         >
           <SelectTrigger className="w-48">
             <SelectValue />
@@ -391,33 +436,66 @@ function OrderRow({
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        {order.shipped_at && <span className="text-xs text-muted-foreground">Shipped {new Date(order.shipped_at as string).toLocaleDateString()}</span>}
+        {order.delivered_at && <span className="text-xs text-muted-foreground">Delivered {new Date(order.delivered_at as string).toLocaleDateString()}</span>}
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <Input placeholder="Carrier" value={carrier} onChange={(e) => setCarrier(e.target.value)} />
         <Input placeholder="Tracking #" value={number} onChange={(e) => setNumber(e.target.value)} />
         <Input
-          placeholder="Tracking URL"
+          placeholder="Tracking URL (https://…)"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           className="sm:col-span-2"
         />
+        <Input type="date" value={expectedDelivery} onChange={(e) => setExpectedDelivery(e.target.value)} className="sm:col-span-2" />
+        <span className="text-xs text-muted-foreground self-center">Expected delivery</span>
       </div>
-      <div className="mt-2 flex justify-end">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() =>
-            onSave({
-              tracking_carrier: carrier || null,
-              tracking_number: number || null,
-              tracking_url: url || null,
-            })
-          }
-        >
-          Save tracking
-        </Button>
+      <div className="mt-2 flex flex-wrap justify-between gap-2">
+        <Button size="sm" variant="ghost" onClick={() => setShowHistory((v) => !v)}>{showHistory ? "Hide history" : "Show history & notifications"}</Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              if (url && !isValidTrackingUrl(url)) { toast.error("Tracking URL must start with https://"); return; }
+              onSave({
+                tracking_carrier: carrier || null,
+                tracking_number: number || null,
+                tracking_url: url || null,
+                expected_delivery_date: expectedDelivery || null,
+              });
+            }}
+          >
+            Save tracking
+          </Button>
+        </div>
       </div>
+
+      {showHistory && (
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-muted/30 p-3">
+            <p className="text-xs font-bold uppercase tracking-widest">History</p>
+            {(history ?? []).length === 0 ? <p className="text-xs text-muted-foreground mt-1">No history yet.</p> : (history ?? []).map((h: any) => (
+              <div key={h.id} className="mt-2 text-xs flex justify-between gap-2">
+                <span>{h.previous_status ?? "—"} → {h.new_status} / {h.previous_fulfillment ?? "—"} → {h.new_fulfillment}</span>
+                <span className="text-muted-foreground">{new Date(h.created_at).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-xl bg-muted/30 p-3">
+            <p className="text-xs font-bold uppercase tracking-widest">Notifications</p>
+            <p className="text-[11px] text-muted-foreground">Provider: none until configured (see order_notifications table comment).</p>
+            {(notifications ?? []).length === 0 ? <p className="text-xs text-muted-foreground mt-1">No events yet.</p> : (notifications ?? []).map((n: any) => (
+              <div key={n.id} className="mt-1 flex justify-between text-xs">
+                <span>{n.event} — {n.status}{n.error ? `: ${n.error.slice(0,60)}` : ""}</span>
+                <span className="text-muted-foreground">{new Date(n.created_at).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
