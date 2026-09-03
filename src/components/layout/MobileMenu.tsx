@@ -15,7 +15,7 @@ import { useAuth } from "@/lib/auth-store";
 export function MobileMenu() {
   const [q, setQ] = useState("");
   const navigate = useNavigate();
-  const { data: cart } = useCart(true);
+  const { data: cart } = useCart(user?.id);
   const { user } = useAuth();
   const cartCount = (cart ?? []).reduce((n, c) => n + c.quantity, 0);
 

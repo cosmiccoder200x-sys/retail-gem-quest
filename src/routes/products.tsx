@@ -110,7 +110,8 @@ function Catalog() {
       if (categoryId) query = query.eq("category_id", categoryId);
 
       if (search.q) {
-        const term = search.q.trim();
+        const raw = search.q.trim();
+        const term = raw.replace(/[%_,"]/g, (m) => `\\${m}`).replace(/,/g, "\\,");
         query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`);
       }
 

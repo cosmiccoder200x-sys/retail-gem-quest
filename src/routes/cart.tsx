@@ -16,7 +16,7 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { user, loading } = useAuth();
-  const { data: items } = useCart(!!user);
+  const { data: items } = useCart(user?.id);
   const update = useUpdateCartQty();
   const remove = useRemoveFromCart();
 

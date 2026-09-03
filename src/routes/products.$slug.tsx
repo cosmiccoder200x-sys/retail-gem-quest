@@ -113,7 +113,8 @@ function ProductPage() {
 
   useEffect(() => {
     if (variants && variants.length > 0 && !selectedVariantId) {
-      setSelectedVariantId(variants[0].id);
+      const firstInStock = variants.find((v) => v.stock > 0) ?? variants[0];
+      setSelectedVariantId(firstInStock.id);
     }
   }, [variants, selectedVariantId]);
 

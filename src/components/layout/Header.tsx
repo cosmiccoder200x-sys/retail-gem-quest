@@ -19,7 +19,7 @@ import {
 
 export function Header() {
   const { user } = useAuth();
-  const { data: cart } = useCart(!!user);
+  const { data: cart } = useCart(user?.id);
   const cartCount = (cart ?? []).reduce((n, c) => n + c.quantity, 0);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -43,7 +43,8 @@ export function Header() {
     queryKey: ["header-search", q],
     enabled: q.trim().length > 1,
     queryFn: async () => {
-      const term = q.trim();
+      const raw = q.trim();
+      const term = raw.replace(/[%_,"]/g, (m) => `\\${m}`).replace(/,/g, "\\,");
       const { data } = await supabase
         .from("products")
         .select("name, slug, price, image_url")

@@ -62,7 +62,7 @@ export const Route = createFileRoute("/_authenticated/checkout")({
 
 function Checkout() {
   const { user } = useAuth();
-  const { data: items } = useCart(!!user);
+  const { data: items } = useCart(user?.id);
   const { data: validation } = useValidateCart(user?.id);
   const navigate = useNavigate();
   const qc = useQueryClient();
