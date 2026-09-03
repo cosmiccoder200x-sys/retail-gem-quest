@@ -46,13 +46,13 @@ interface RazorpayResponse {
 }
 
 const schema = z.object({
-  full_name: z.string().min(2).max(80),
-  phone: z.string().min(10).max(15).regex(/^[0-9+ -]+$/),
-  line1: z.string().min(3).max(200),
-  line2: z.string().max(200).optional(),
-  city: z.string().min(2).max(80),
-  state: z.string().min(2).max(80),
-  pincode: z.string().regex(/^[0-9]{6}$/, "6-digit pincode"),
+  full_name: z.string().trim().min(2).max(80),
+  phone: z.string().trim().min(10).max(15).regex(/^[0-9]{10,15}$/, "Enter 10-15 digits"),
+  line1: z.string().trim().min(3).max(200),
+  line2: z.string().trim().max(200).optional(),
+  city: z.string().trim().min(2).max(80),
+  state: z.string().trim().min(2).max(80),
+  pincode: z.string().trim().regex(/^[0-9]{6}$/, "6-digit pincode"),
 });
 
 export const Route = createFileRoute("/_authenticated/checkout")({
@@ -134,6 +134,7 @@ function Checkout() {
   };
   const removeCoupon = () => { setAppliedCoupon(null); setCouponInput(""); setCouponError(null); };
 
+  const isEmptyCart = !items || items.length === 0;
   const hasValidationErrors = validation?.some((v: { is_valid: boolean }) => !v.is_valid);
   const validationError = validation?.find(
     (v: { is_valid: boolean; error_message?: string }) => !v.is_valid
@@ -141,15 +142,24 @@ function Checkout() {
 
   const openRazorpay = useCallback(
     async (orderId: string) => {
-      // Load Razorpay script
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      document.body.appendChild(script);
-
-      await new Promise<void>((resolve, reject) => {
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
-      });
+      // Load Razorpay script (dedup)
+      let script = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]') as HTMLScriptElement | null;
+      if (!script) {
+        script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        document.body.appendChild(script);
+        await new Promise<void>((resolve, reject) => {
+          script!.onload = () => resolve();
+          script!.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
+        });
+      } else if (!(window as any).Razorpay) {
+        await new Promise<void>((resolve) => {
+          const check = setInterval(() => {
+            if ((window as any).Razorpay) { clearInterval(check); resolve(); }
+          }, 50);
+          setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+        });
+      }
 
       // Create Razorpay order via Edge Function
       const { data: sessionData } = await supabase.auth.getSession();
@@ -230,6 +240,8 @@ function Checkout() {
         theme: { color: "#0891b2" },
         modal: {
           ondismiss: () => {
+            setBusy(false);
+            processingRef.current = false;
             toast.info("Payment cancelled. You can retry from your orders.");
             navigate({ to: "/account", hash: "orders" });
           },
@@ -533,7 +545,7 @@ function Checkout() {
           </div>
           <Button
             type="submit"
-            disabled={busy || hasValidationErrors}
+            disabled={busy || hasValidationErrors || isEmptyCart}
             size="lg"
             className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan mt-4"
           >
@@ -554,6 +566,9 @@ function Checkout() {
               Secured by Razorpay. Test mode.
             </p>
           )}
+          <p className="mt-3 text-center text-xs text-muted-foreground">
+            <a href="/shipping" className="underline hover:text-brand">Shipping</a> · <a href="/returns" className="underline hover:text-brand">Returns</a> · <a href="/privacy" className="underline hover:text-brand">Privacy</a> · <a href="/terms" className="underline hover:text-brand">Terms</a>
+          </p>
         </aside>
       </form>
     </div>

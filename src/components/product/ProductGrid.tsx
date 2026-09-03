@@ -1,4 +1,4 @@
-import { ProductCardSkeleton } from "./ProductCard";
+import { ProductCard, ProductCardSkeleton } from "./ProductCard";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
 import { type ProductCardData } from "./ProductCard";

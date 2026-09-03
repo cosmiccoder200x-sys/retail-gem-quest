@@ -1,16 +1,11 @@
 import { useState } from "react";
-import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, Search, ShoppingBag, Star } from "lucide-react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { ArrowRight, Sparkles, Truck, BadgeIndianRupee, ShieldCheck, Gift, Trash2, RefreshCw, Heart, Sun, ChevronDown, Rocket, ShoppingBag, Star } from "lucide-react";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ProductGrid, type ProductCardData } from "@/components/product/ProductGrid";
 import { SectionHeader } from "@/components/common/SectionHeader";
 import { Button } from "@/components/ui/button";
-import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
-import { formatINR } from "@/lib/format";
-import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { Footer } from "@/components/layout/Footer";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,9 +33,6 @@ const productCols =
   "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, is_bestseller, is_featured";
 
 function Index() {
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-
   const { data: featured } = useQuery({
     queryKey: ["home-featured"],
     queryFn: async () => {
@@ -79,47 +71,6 @@ function Index() {
 
   return (
     <div>
-      {/* Announcement Bar */}
-      <AnnouncementBar />
-
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-14">
-          <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl shrink-0">
-            Gully<span className="text-brand">Gadget</span>
-          </Link>
-
-          <nav className="ml-auto hidden gap-3 text-sm font-medium text-muted-foreground lg:flex">
-            {(categories ?? []).slice(0, 4).map((cat) => (
-              <Link key={cat.slug} to="/products" search={{ category: cat.slug }} className="hover:text-brand">
-                {cat.name}
-              </Link>
-            ))}
-            <Link to="/products" className="font-semibold text-brand">₹999 Store</Link>
-          </nav>
-
-          <form onSubmit={(e) => { e.preventDefault(); if (searchQuery.trim()) navigate({ to: "/products", search: { q: searchQuery.trim() } }); }} className="relative hidden md:flex items-center gap-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search gadgets…"
-              className="rounded-full pl-9"
-            />
-          </form>
-
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <Link
-              to="/cart"
-              aria-label="Cart"
-              className="relative grid size-10 place-items-center rounded-full bg-brand text-brand-foreground"
-            >
-              <ShoppingBag className="size-4" />
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Hero Section */}
       <section className="mx-auto max-w-7xl overflow-hidden rounded-3xl bg-brand-soft pt-6 sm:pt-12">
@@ -299,17 +250,17 @@ function Index() {
         />
         <div className="rounded-3xl bg-card p-6 ring-1 ring-border">
           <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {[4.8, 4.7, 4.9, 4.6, 4.8, 4.7].map((rating, i) => (
               <div
                 key={i}
                 className="flex items-center gap-2 text-sm text-muted-foreground"
               >
                 <Star className="size-3 fill-offer text-offer" />
-                <span>{(4 + Math.random() * 2).toFixed(1)}</span>
+                <span>{rating.toFixed(1)}</span>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-center text-sm text-muted-foreground">Verified purchases, all rated 4+ stars</p>
+          <p className="mt-3 text-center text-sm text-muted-foreground">Example ratings from catalog — see product pages for real reviews</p>
         </div>
       </section>
 
@@ -372,8 +323,6 @@ function Index() {
         </div>
       </section>
 
-      {/* Footer */}
-      <Footer />
     </div>
   );
 }

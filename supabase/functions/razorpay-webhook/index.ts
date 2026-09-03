@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://gullygadget.com",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -50,23 +50,20 @@ serve(async (req: Request) => {
     const rawBody = await req.text();
     const signature = req.headers.get("x-razorpay-signature") || "";
 
-    // Verify webhook signature
-    if (razorpayWebhookSecret) {
-      const isValid = await verifyWebhookSignature(
-        rawBody,
-        signature,
-        razorpayWebhookSecret
+    if (!razorpayWebhookSecret) {
+      console.error("RAZORPAY_WEBHOOK_SECRET not configured — rejecting webhook");
+      return new Response(
+        JSON.stringify({ error: "Webhook not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-
-      if (!isValid) {
-        console.error("Invalid webhook signature");
-        return new Response(
-          JSON.stringify({ error: "Invalid signature" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    } else {
-      console.warn("RAZORPAY_WEBHOOK_SECRET not set — skipping signature verification");
+    }
+    const isValid = await verifyWebhookSignature(rawBody, signature, razorpayWebhookSecret);
+    if (!isValid) {
+      console.error("Invalid webhook signature");
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const event = JSON.parse(rawBody);
@@ -116,10 +113,9 @@ async function handlePaymentCaptured(
   const razorpayOrderId = payment.order_id as string;
   const razorpayPaymentId = payment.id as string;
 
-  // Find the payment record by Razorpay order ID (idempotent)
   const { data: existingPayment } = await supabase
     .from("payments")
-    .select("id, order_id, status")
+    .select("id, order_id, status, amount")
     .eq("provider_order_id", razorpayOrderId)
     .eq("provider", "razorpay")
     .maybeSingle();
@@ -128,14 +124,22 @@ async function handlePaymentCaptured(
     console.error("No payment record found for Razorpay order:", razorpayOrderId);
     return;
   }
-
-  // Idempotent: skip if already paid
   if (existingPayment.status === "paid") {
     console.log("Payment already captured, skipping:", razorpayOrderId);
     return;
   }
-
-  // Update payment
+  // Prevent downgrade: if already failed, don't auto-mark paid? Allow upgrade failed->paid
+  const { data: order } = await supabase.from("orders").select("total, payment_status, status, fulfillment_status").eq("id", existingPayment.order_id).single();
+  if (!order) return;
+  if (order.fulfillment_status === "cancelled" || order.fulfillment_status === "delivered" || order.status === "cancelled") {
+    console.log("Order in terminal state, skipping capture:", razorpayOrderId);
+    return;
+  }
+  const expectedPaise = Math.round(Number(order.total) * 100);
+  if (payment.amount !== undefined && Number(payment.amount) !== expectedPaise) {
+    console.error(`Amount mismatch for ${razorpayOrderId}: got ${payment.amount}, expected ${expectedPaise}`);
+    return;
+  }
   await supabase
     .from("payments")
     .update({
@@ -150,15 +154,13 @@ async function handlePaymentCaptured(
     })
     .eq("id", existingPayment.id);
 
-  // Update order
   await supabase
     .from("orders")
     .update({
       payment_status: "paid",
-      status: "confirmed",
+      status: order.status === "cancelled" ? order.status : "confirmed",
     })
     .eq("id", existingPayment.order_id);
-
   console.log("Payment captured via webhook:", razorpayOrderId);
 }
 
@@ -179,10 +181,13 @@ async function handlePaymentFailed(
     console.error("No payment record found for failed payment:", razorpayOrderId);
     return;
   }
-
-  // Idempotent: skip if already failed
   if (existingPayment.status === "failed") {
     console.log("Payment already marked as failed, skipping:", razorpayOrderId);
+    return;
+  }
+  // Never downgrade paid → failed
+  if (existingPayment.status === "paid") {
+    console.log("Payment already paid, ignoring failed event:", razorpayOrderId);
     return;
   }
 

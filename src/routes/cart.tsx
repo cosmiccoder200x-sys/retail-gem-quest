@@ -133,7 +133,7 @@ function CartPage() {
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-display text-lg italic">{formatINR(it.variant?.price ?? it.product.price) * it.quantity}</span>
+                    <span className="font-display text-lg italic">{formatINR((it.variant?.price ?? it.product.price) * it.quantity)}</span>
                     <button
                       aria-label="Remove"
                       onClick={() => remove.mutate(it.id)}

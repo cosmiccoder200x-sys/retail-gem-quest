@@ -36,12 +36,18 @@ function AuthPage() {
       if (tab === "signup") {
         const parsed = signupSchema.safeParse({ name, email, password });
         if (!parsed.success) throw new Error(parsed.error.issues[0].message);
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: window.location.origin, data: { full_name: name } },
         });
         if (error) throw error;
+        // If email confirmation required, session will be null
+        if (!data.session) {
+          toast.success("Check your email to confirm your account, then sign in.");
+          setTab("signin");
+          return;
+        }
         toast.success("Account created!");
       } else {
         const parsed = signinSchema.safeParse({ email, password });

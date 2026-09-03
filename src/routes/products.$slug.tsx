@@ -14,15 +14,36 @@ import { RecentlyViewed } from "@/components/product/RecentlyViewed";
 import { useRecentlyViewed } from "@/lib/recentlyViewed";
 import { toast } from "sonner";
 
+import { siteConfig } from "@/lib/site";
+
 export const Route = createFileRoute("/products/$slug")({
   component: ProductPage,
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug} — GullyGadget` },
-      { property: "og:url", content: `/products/${params.slug}` },
-    ],
-    links: [{ rel: "canonical", href: `/products/${params.slug}` }],
-  }),
+  loader: async ({ params }) => {
+    const { data } = await supabase.from("products").select("name, short_description, description, image_url, price, mrp, stock, rating, review_count").eq("slug", params.slug).eq("is_active", true).maybeSingle();
+    return data;
+  },
+  head: ({ loaderData, params }) => {
+    const name = (loaderData as any)?.name ?? params.slug.replace(/-/g, " ");
+    const desc = (loaderData as any)?.short_description ?? (loaderData as any)?.description ?? "Shop this product at GullyGadget.";
+    const img = (loaderData as any)?.image_url ?? "";
+    const title = `${name} | ${siteConfig.name}`;
+    return {
+      meta: [
+        { title },
+        { name: "description", content: String(desc).slice(0, 160) },
+        { property: "og:title", content: title },
+        { property: "og:description", content: String(desc).slice(0, 160) },
+        { property: "og:type", content: "product" },
+        { property: "og:url", content: `${siteConfig.url}/products/${params.slug}` },
+        ...(img ? [{ property: "og:image", content: img }] : []),
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: String(desc).slice(0, 160) },
+        ...(img ? [{ name: "twitter:image", content: img }] : []),
+      ],
+      links: [{ rel: "canonical", href: `/products/${params.slug}` }],
+    };
+  },
 });
 
 type ProductImage = { url: string; alt?: string };
@@ -90,6 +111,12 @@ function ProductPage() {
     },
   });
 
+  useEffect(() => {
+    if (variants && variants.length > 0 && !selectedVariantId) {
+      setSelectedVariantId(variants[0].id);
+    }
+  }, [variants, selectedVariantId]);
+
   useRecentlyViewed(product?.id);
 
   if (isLoading) {
@@ -107,12 +134,6 @@ function ProductPage() {
   }
 
   if (!product) return null;
-
-  useEffect(() => {
-    if (variants && variants.length > 0 && !selectedVariantId) {
-      setSelectedVariantId(variants[0].id);
-    }
-  }, [variants, selectedVariantId]);
 
   const selectedVariant = variants?.find((v) => v.id === selectedVariantId) ?? null;
   const displayPrice = selectedVariant?.price ?? product.price;
@@ -243,12 +264,13 @@ function ProductPage() {
 
           <div className="grid grid-cols-2 gap-3 pt-4">
             <div className="flex items-center gap-2 rounded-2xl bg-brand-soft p-3 text-sm">
-              <Truck className="size-5 text-brand" /> Free shipping
+              <Truck className="size-5 text-brand" /> Free shipping — <a href="/shipping" className="underline hover:text-brand">details</a>
             </div>
             <div className="flex items-center gap-2 rounded-2xl bg-brand-soft p-3 text-sm">
-              <ShieldCheck className="size-5 text-brand" /> 1Y warranty
+              <ShieldCheck className="size-5 text-brand" /> 7-day return — <a href="/returns" className="underline hover:text-brand">policy</a>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">Secure checkout · COD available · <a href="/faq" className="underline hover:text-brand">FAQ</a> · <a href="/contact" className="underline hover:text-brand">Support</a></p>
 
           <div className="pt-6">
             <h3 className="mb-3 font-display text-xl uppercase">Description</h3>
@@ -299,6 +321,50 @@ function ProductPage() {
       {product && <ReviewsSection productId={product.id} />}
 
       {product && <RecentlyViewed excludeId={product.id} />}
+
+      {/* Structured data — only real values */}
+      {product && (
+        <>
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "Product",
+                name: product.name,
+                description: product.short_description || product.description || undefined,
+                image: product.image_url ? [product.image_url] : undefined,
+                sku: (product as any).sku || undefined,
+                offers: {
+                  "@type": "Offer",
+                  price: String(displayPrice),
+                  priceCurrency: "INR",
+                  availability: displayStock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                  url: `${siteConfig.url}/products/${product.slug}`,
+                },
+                aggregateRating:
+                  product.review_count > 0
+                    ? { "@type": "AggregateRating", ratingValue: String(product.rating), reviewCount: String(product.review_count) }
+                    : undefined,
+              }),
+            }}
+          />
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "BreadcrumbList",
+                itemListElement: [
+                  { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
+                  { "@type": "ListItem", position: 2, name: "Products", item: `${siteConfig.url}/products` },
+                  { "@type": "ListItem", position: 3, name: product.name, item: `${siteConfig.url}/products/${product.slug}` },
+                ],
+              }),
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

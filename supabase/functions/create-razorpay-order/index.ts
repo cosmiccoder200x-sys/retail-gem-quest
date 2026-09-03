@@ -103,12 +103,12 @@ serve(async (req: Request) => {
       .eq("status", "pending")
       .maybeSingle();
 
-    // If there's an existing pending payment with a Razorpay order, return it
+    // If there's an existing pending payment with a Razorpay order, return it (amount in paise)
     if (existingPayment?.provider_order_id) {
       return new Response(
         JSON.stringify({
           razorpay_order_id: existingPayment.provider_order_id,
-          amount: order.total,
+          amount: Math.round(Number(order.total) * 100),
           currency: order.currency || "INR",
           key_id: razorpayKeyId,
         }),

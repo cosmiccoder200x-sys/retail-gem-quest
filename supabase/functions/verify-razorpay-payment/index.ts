@@ -134,6 +134,26 @@ serve(async (req: Request) => {
       );
     }
 
+    // Verify amount matches authoritative total (prevent underpayment)
+    const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID")!;
+    try {
+      const verifyRes = await fetch(`https://api.razorpay.com/v1/payments/${razorpay_payment_id}`, {
+        headers: { Authorization: `Basic ${btoa(`${razorpayKeyId}:${razorpayKeySecret}`)}` },
+      });
+      if (verifyRes.ok) {
+        const razorpayPayment: any = await verifyRes.json();
+        const expectedPaise = Math.round(Number(order.total) * 100);
+        if (Number(razorpayPayment.amount) !== expectedPaise) {
+          return new Response(JSON.stringify({ error: `Amount mismatch: expected ${expectedPaise}, got ${razorpayPayment.amount}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        if (razorpayPayment.status !== "captured" && razorpayPayment.status !== "authorized") {
+          return new Response(JSON.stringify({ error: `Payment not captured: ${razorpayPayment.status}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    } catch (_e) {
+      console.warn("Razorpay amount verify failed, continuing with signature only");
+    }
+
     // Fetch the payment record
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
