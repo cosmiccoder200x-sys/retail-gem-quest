@@ -40,11 +40,13 @@ function Admin() {
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><AdminOrders /></TabsContent>
         <TabsContent value="products"><AdminProducts /></TabsContent>
         <TabsContent value="categories"><AdminCategories /></TabsContent>
+        <TabsContent value="reviews"><AdminReviews /></TabsContent>
         <TabsContent value="suppliers"><AdminSuppliers /></TabsContent>
       </Tabs>
     </div>
@@ -607,6 +609,104 @@ function AdminCategories() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AdminReviews() {
+  const qc = useQueryClient();
+  const [q, setQ] = useState("");
+  const [ratingFilter, setRatingFilter] = useState("all");
+  const [visibleFilter, setVisibleFilter] = useState("all");
+
+  const { data: reviews, isPending } = useQuery({
+    queryKey: ["admin-reviews", q, ratingFilter, visibleFilter],
+    queryFn: async () => {
+      let query = supabase
+        .from("reviews")
+        .select("*, products(name, slug), profiles(full_name)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+      if (ratingFilter !== "all") query = query.eq("rating", Number(ratingFilter));
+      if (visibleFilter === "visible") query = query.eq("is_visible", true);
+      if (visibleFilter === "hidden") query = query.eq("is_visible", false);
+      if (q.trim()) query = query.ilike("review_text", `%${q.trim()}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const toggleVisible = useMutation({
+    mutationFn: async ({ id, is_visible }: { id: string; is_visible: boolean }) => {
+      const { error } = await supabase.from("reviews").update({ is_visible }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Review updated");
+      qc.invalidateQueries({ queryKey: ["admin-reviews"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("reviews").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Review deleted");
+      qc.invalidateQueries({ queryKey: ["admin-reviews"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input placeholder="Search review text…" value={q} onChange={(e) => setQ(e.target.value)} className="w-56" />
+        <Select value={ratingFilter} onValueChange={setRatingFilter}>
+          <SelectTrigger className="w-32"><SelectValue placeholder="Rating" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All ratings</SelectItem>
+            <SelectItem value="5">5 ★</SelectItem>
+            <SelectItem value="4">4 ★</SelectItem>
+            <SelectItem value="3">3 ★</SelectItem>
+            <SelectItem value="2">2 ★</SelectItem>
+            <SelectItem value="1">1 ★</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={visibleFilter} onValueChange={setVisibleFilter}>
+          <SelectTrigger className="w-32"><SelectValue placeholder="Visibility" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="visible">Visible</SelectItem>
+            <SelectItem value="hidden">Hidden</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {isPending && <p className="text-sm text-muted-foreground">Loading reviews…</p>}
+      {!isPending && (reviews ?? []).length === 0 && <p className="text-sm text-muted-foreground">No reviews match.</p>}
+      {(reviews ?? []).map((r: any) => (
+        <div key={r.id} className={`rounded-2xl bg-white p-4 ring-1 ring-border ${!r.is_visible ? "opacity-60" : ""}`}>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-bold">{r.products?.name ?? r.product_id.slice(0, 8)}</span>
+            <span className="text-muted-foreground">by {r.profiles?.full_name ?? r.user_id.slice(0, 8)}</span>
+            <span className="bg-secondary px-2 py-0.5 rounded-full">{r.rating} ★</span>
+            {r.verified_purchase && <span className="bg-success/10 text-success px-2 py-0.5 rounded-full">Verified</span>}
+            {!r.is_visible && <span className="bg-destructive/10 text-destructive px-2 py-0.5 rounded-full">Hidden</span>}
+            <span className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</span>
+            <div className="ml-auto flex gap-1">
+              <Button size="sm" variant="outline" onClick={() => toggleVisible.mutate({ id: r.id, is_visible: !r.is_visible })}>
+                {r.is_visible ? "Hide" : "Approve"}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => del.mutate(r.id)}>Delete</Button>
+            </div>
+          </div>
+          <p className="mt-2 text-sm leading-relaxed break-words">{r.review_text}</p>
+        </div>
+      ))}
     </div>
   );
 }

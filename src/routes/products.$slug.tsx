@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Heart, ShoppingBag, Star, Truck, ShieldCheck } from "lucide-react";
 import { formatINR, discountPct } from "@/lib/format";
 import { useAddToCart, useToggleWishlist } from "@/lib/cart";
+import { ReviewsSection } from "@/components/reviews/ReviewsSection";
+import { RecentlyViewed } from "@/components/product/RecentlyViewed";
+import { useRecentlyViewed } from "@/lib/recentlyViewed";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/products/$slug")({
@@ -80,10 +83,14 @@ function ProductPage() {
         .eq("category_id", product!.category_id!)
         .neq("id", product!.id)
         .eq("is_active", true)
-        .limit(3);
+        .gt("stock", 0)
+        .order("rating", { ascending: false })
+        .limit(4);
       return data ?? [];
     },
   });
+
+  useRecentlyViewed(product?.id);
 
   if (isLoading) {
     return (
@@ -267,14 +274,31 @@ function ProductPage() {
       {related && related.length > 0 && (
         <section className="mt-16">
           <h2 className="mb-8 font-display text-3xl uppercase">Related Products</h2>
-          <ProductGrid
-            products={related as ProductCardData[]}
-            loading={false}
-            error={false}
-            emptyMessage="No related products"
-          />
+          <div className="overflow-x-auto -mx-6 px-6 lg:mx-0 lg:px-0">
+            <div className="flex gap-4 lg:grid lg:grid-cols-4">
+              <div className="contents lg:hidden">
+                {related.map((p) => (
+                  <div key={p.id} className="w-44 shrink-0">
+                    <ProductCard product={p as ProductCardData} />
+                  </div>
+                ))}
+              </div>
+              <div className="hidden lg:contents">
+                <ProductGrid
+                  products={related as ProductCardData[]}
+                  loading={false}
+                  error={false}
+                  emptyMessage="No related products"
+                />
+              </div>
+            </div>
+          </div>
         </section>
       )}
+
+      {product && <ReviewsSection productId={product.id} />}
+
+      {product && <RecentlyViewed excludeId={product.id} />}
     </div>
   );
 }
