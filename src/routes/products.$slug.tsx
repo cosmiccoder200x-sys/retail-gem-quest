@@ -19,12 +19,22 @@ import { siteConfig } from "@/lib/site";
 export const Route = createFileRoute("/products/$slug")({
   component: ProductPage,
   loader: async ({ params }) => {
-    const { data } = await supabase.from("products").select("name, short_description, description, image_url, price, mrp, stock, rating, review_count").eq("slug", params.slug).eq("is_active", true).maybeSingle();
+    const { data } = await supabase
+      .from("products")
+      .select(
+        "name, short_description, description, image_url, price, mrp, stock, rating, review_count",
+      )
+      .eq("slug", params.slug)
+      .eq("is_active", true)
+      .maybeSingle();
     return data;
   },
   head: ({ loaderData, params }) => {
     const name = (loaderData as any)?.name ?? params.slug.replace(/-/g, " ");
-    const desc = (loaderData as any)?.short_description ?? (loaderData as any)?.description ?? "Shop this product at GullyGadget.";
+    const desc =
+      (loaderData as any)?.short_description ??
+      (loaderData as any)?.description ??
+      "Shop this product at GullyGadget.";
     const img = (loaderData as any)?.image_url ?? "";
     const title = `${name} | ${siteConfig.name}`;
     return {
@@ -100,7 +110,9 @@ function ProductPage() {
     queryFn: async () => {
       const { data } = await supabase
         .from("products")
-        .select("id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, stock")
+        .select(
+          "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, stock",
+        )
         .eq("category_id", product!.category_id!)
         .neq("id", product!.id)
         .eq("is_active", true)
@@ -119,6 +131,16 @@ function ProductPage() {
   }, [variants, selectedVariantId]);
 
   useRecentlyViewed(product?.id);
+
+  const addToCartWithVariant = useMutation({
+    mutationFn: async ({ productId, variantId }: { productId: string; variantId?: string }) => {
+      await addToCart.mutateAsync({ product_id: productId, variant_id: variantId ?? undefined });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cart"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   if (isLoading) {
     return (
@@ -142,29 +164,19 @@ function ProductPage() {
   const displayStock = selectedVariant?.stock ?? product.stock;
   const off = discountPct(displayPrice, displayMrp);
 
-  const images: ProductImage[] = (product.images as any[]) ??
-    (selectedVariant?.image_url ? [{ url: selectedVariant.image_url, alt: product.name }] : [])
-    ?? (product.image_url ? [{ url: product.image_url, alt: product.name }] : []);
-
-  const addToCartWithVariant = useMutation({
-    mutationFn: async ({ productId, variantId }: { productId: string; variantId?: string }) => {
-      await addToCart.mutateAsync({ product_id: productId, variant_id: variantId ?? undefined });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["cart"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const images: ProductImage[] =
+    (Array.isArray(product.images) && product.images.length > 0
+      ? (product.images as any[])
+      : null) ||
+    (selectedVariant?.image_url ? [{ url: selectedVariant.image_url, alt: product.name }] : null) ||
+    (product.image_url ? [{ url: product.image_url, alt: product.name }] : []);
 
   const specs = (product.specs ?? {}) as Record<string, string>;
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-12">
       <div className="grid gap-8 lg:grid-cols-2">
-        <ProductImageGallery
-          images={images}
-          productName={product.name}
-        />
+        <ProductImageGallery images={images} productName={product.name} />
 
         <div className="space-y-5">
           {product.badge && (
@@ -209,7 +221,9 @@ function ProductPage() {
                       } ${isOutOfStock ? "opacity-50 cursor-not-allowed" : ""}`}
                     >
                       {label}
-                      {isOutOfStock && <span className="text-xs text-destructive">(Out of stock)</span>}
+                      {isOutOfStock && (
+                        <span className="text-xs text-destructive">(Out of stock)</span>
+                      )}
                     </button>
                   );
                 })}
@@ -237,7 +251,12 @@ function ProductPage() {
             <Button
               size="lg"
               disabled={displayStock === 0 || addToCartWithVariant.isPending}
-              onClick={() => addToCartWithVariant.mutate({ productId: product.id, variantId: selectedVariantId ?? undefined })}
+              onClick={() =>
+                addToCartWithVariant.mutate({
+                  productId: product.id,
+                  variantId: selectedVariantId ?? undefined,
+                })
+              }
               className="flex-1 rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan"
             >
               <ShoppingBag className="mr-2 size-4" /> Add to Cart
@@ -246,8 +265,11 @@ function ProductPage() {
               size="lg"
               disabled={displayStock === 0 || addToCartWithVariant.isPending}
               onClick={async () => {
-                await addToCartWithVariant.mutateAsync({ productId: product.id, variantId: selectedVariantId ?? undefined });
-                navigate({ to: "/_authenticated/checkout" });
+                await addToCartWithVariant.mutateAsync({
+                  productId: product.id,
+                  variantId: selectedVariantId ?? undefined,
+                });
+                navigate({ to: "/checkout" });
               }}
               className="flex-1 rounded-full bg-accent-cyan font-bold uppercase tracking-tighter hover:bg-brand"
             >
@@ -265,13 +287,28 @@ function ProductPage() {
 
           <div className="grid grid-cols-2 gap-3 pt-4">
             <div className="flex items-center gap-2 rounded-2xl bg-brand-soft p-3 text-sm">
-              <Truck className="size-5 text-brand" /> Free shipping — <a href="/shipping" className="underline hover:text-brand">details</a>
+              <Truck className="size-5 text-brand" /> Free shipping —{" "}
+              <a href="/shipping" className="underline hover:text-brand">
+                details
+              </a>
             </div>
             <div className="flex items-center gap-2 rounded-2xl bg-brand-soft p-3 text-sm">
-              <ShieldCheck className="size-5 text-brand" /> 7-day return — <a href="/returns" className="underline hover:text-brand">policy</a>
+              <ShieldCheck className="size-5 text-brand" /> 7-day return —{" "}
+              <a href="/returns" className="underline hover:text-brand">
+                policy
+              </a>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Secure checkout · COD available · <a href="/faq" className="underline hover:text-brand">FAQ</a> · <a href="/contact" className="underline hover:text-brand">Support</a></p>
+          <p className="text-xs text-muted-foreground">
+            Secure checkout · COD available ·{" "}
+            <a href="/faq" className="underline hover:text-brand">
+              FAQ
+            </a>{" "}
+            ·{" "}
+            <a href="/contact" className="underline hover:text-brand">
+              Support
+            </a>
+          </p>
 
           <div className="pt-6">
             <h3 className="mb-3 font-display text-xl uppercase">Description</h3>
@@ -340,12 +377,19 @@ function ProductPage() {
                   "@type": "Offer",
                   price: String(displayPrice),
                   priceCurrency: "INR",
-                  availability: displayStock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                  availability:
+                    displayStock > 0
+                      ? "https://schema.org/InStock"
+                      : "https://schema.org/OutOfStock",
                   url: `${siteConfig.url}/products/${product.slug}`,
                 },
                 aggregateRating:
                   product.review_count > 0
-                    ? { "@type": "AggregateRating", ratingValue: String(product.rating), reviewCount: String(product.review_count) }
+                    ? {
+                        "@type": "AggregateRating",
+                        ratingValue: String(product.rating),
+                        reviewCount: String(product.review_count),
+                      }
                     : undefined,
               }),
             }}
@@ -358,8 +402,18 @@ function ProductPage() {
                 "@type": "BreadcrumbList",
                 itemListElement: [
                   { "@type": "ListItem", position: 1, name: "Home", item: siteConfig.url },
-                  { "@type": "ListItem", position: 2, name: "Products", item: `${siteConfig.url}/products` },
-                  { "@type": "ListItem", position: 3, name: product.name, item: `${siteConfig.url}/products/${product.slug}` },
+                  {
+                    "@type": "ListItem",
+                    position: 2,
+                    name: "Products",
+                    item: `${siteConfig.url}/products`,
+                  },
+                  {
+                    "@type": "ListItem",
+                    position: 3,
+                    name: product.name,
+                    item: `${siteConfig.url}/products/${product.slug}`,
+                  },
                 ],
               }),
             }}

@@ -49,7 +49,7 @@ export function useCart(userId?: string | null) {
       const { data, error } = await supabase
         .from("cart_items")
         .select(
-          `id, product_id, variant_id, quantity, ${getProductSelect()}, ${getVariantSelect()}`
+          `id, product_id, variant_id, quantity, ${getProductSelect()}, ${getVariantSelect()}`,
         )
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -87,14 +87,12 @@ export function useAddToCart() {
           .eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("cart_items")
-          .insert({
-            user_id: user.user.id,
-            product_id: product_id,
-            variant_id: variant_id ?? null,
-            quantity,
-          });
+        const { error } = await supabase.from("cart_items").insert({
+          user_id: user.user.id,
+          product_id: product_id,
+          variant_id: variant_id ?? null,
+          quantity,
+        });
         if (error) throw error;
       }
     },
@@ -111,10 +109,7 @@ export function useUpdateCartQty() {
   return useMutation({
     mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
       if (quantity < 1) throw new Error("Quantity must be at least 1");
-      const { error } = await supabase
-        .from("cart_items")
-        .update({ quantity })
-        .eq("id", id);
+      const { error } = await supabase.from("cart_items").update({ quantity }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["cart"] }),
@@ -143,7 +138,7 @@ export function useWishlist(enabled: boolean) {
       const { data, error } = await supabase
         .from("wishlist_items")
         .select(
-          `id, product_id, variant_id, product:products(id, name, slug, price, mrp, image_url, rating, review_count), variant:product_variants(id, price, mrp, stock, image_url, attributes)`
+          `id, product_id, variant_id, product:products(id, name, slug, price, mrp, image_url, rating, review_count), variant:product_variants(id, price, mrp, stock, image_url, attributes)`,
         );
       if (error) throw error;
       return data ?? [];
@@ -191,7 +186,7 @@ export function useValidateCart(userId: string | undefined) {
     queryKey: ["cart-validation", userId],
     enabled: !!userId,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("validate_cart", { p_user_id: userId });
+      const { data, error } = await supabase.rpc("validate_cart", { p_user_id: userId! });
       if (error) throw error;
       return data ?? [];
     },

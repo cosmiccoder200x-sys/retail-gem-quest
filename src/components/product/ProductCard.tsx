@@ -102,9 +102,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               {formatINR(product.mrp)}
             </span>
           )}
-          {off > 0 && (
-            <span className="text-xs font-bold text-success">{off}% OFF</span>
-          )}
+          {off > 0 && <span className="text-xs font-bold text-success">{off}% OFF</span>}
         </div>
         <Button
           size="icon"

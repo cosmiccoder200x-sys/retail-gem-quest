@@ -1,10 +1,12 @@
 # Roadmap
 
 ## Now
+
 - [ ] Redesign storefront visual direction (user dislikes current design) — pick palette/type/layout, then apply
 - [ ] Audit DB tables (products, categories, product_variants, customers, addresses, orders, order_items, payments)
 
 ## Production e-commerce (requested)
+
 - [ ] Admin product CRUD: multi-image upload, enable/disable, SKU, stock, discount %, category, variants, shipping info, featured
 - [ ] Cart persistence + totals (subtotal, discount, shipping, total)
 - [ ] Checkout: customer details, address, shipping, payment, confirmation

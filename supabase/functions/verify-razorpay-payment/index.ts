@@ -1,35 +1,27 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedEnv = Deno.env.get("ALLOWED_ORIGIN") || "https://gullygadget.com";
 
-// Verify Razorpay signature
-function verifySignature(
-  body: string,
-  signature: string,
-  secret: string
-): boolean {
-  const encoder = new TextEncoder();
-  const key = encoder.encode(secret);
-  const data = encoder.encode(body);
+  const isAllowed =
+    origin === allowedEnv ||
+    origin === "https://gullygadget.com" ||
+    origin.endsWith(".gullygadget.com") ||
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.includes("lovableproject.com");
 
-  // Use SubtleCrypto HMAC-SHA256
-  return crypto.subtle
-    .importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-    .then((cryptoKey) => crypto.subtle.sign("HMAC", cryptoKey, data))
-    .then((sig) => {
-      const generated = Array.from(new Uint8Array(sig))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-      return generated === signature;
-    });
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedEnv,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
 }
 
 serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -39,19 +31,19 @@ serve(async (req: Request) => {
       await req.json();
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !order_id) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify user is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -70,10 +62,10 @@ serve(async (req: Request) => {
     } = await supabaseUser.auth.getUser();
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify signature server-side
@@ -95,7 +87,7 @@ serve(async (req: Request) => {
       key,
       { name: "HMAC", hash: "SHA-256" },
       false,
-      ["sign"]
+      ["sign"],
     );
     const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
     const generatedSignature = Array.from(new Uint8Array(sigBuffer))
@@ -103,10 +95,10 @@ serve(async (req: Request) => {
       .join("");
 
     if (generatedSignature !== razorpay_signature) {
-      return new Response(
-        JSON.stringify({ error: "Invalid payment signature" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid payment signature" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Use service_role for database operations
@@ -120,18 +112,18 @@ serve(async (req: Request) => {
       .single();
 
     if (orderError || !order) {
-      return new Response(
-        JSON.stringify({ error: "Order not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Order not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify order belongs to this user
     if (order.user_id !== user.id) {
-      return new Response(
-        JSON.stringify({ error: "Forbidden" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Verify amount matches authoritative total (prevent underpayment)
@@ -144,10 +136,18 @@ serve(async (req: Request) => {
         const razorpayPayment: any = await verifyRes.json();
         const expectedPaise = Math.round(Number(order.total) * 100);
         if (Number(razorpayPayment.amount) !== expectedPaise) {
-          return new Response(JSON.stringify({ error: `Amount mismatch: expected ${expectedPaise}, got ${razorpayPayment.amount}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({
+              error: `Amount mismatch: expected ${expectedPaise}, got ${razorpayPayment.amount}`,
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
         }
         if (razorpayPayment.status !== "captured" && razorpayPayment.status !== "authorized") {
-          return new Response(JSON.stringify({ error: `Payment not captured: ${razorpayPayment.status}` }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          return new Response(
+            JSON.stringify({ error: `Payment not captured: ${razorpayPayment.status}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
         }
       }
     } catch (_e) {
@@ -164,18 +164,17 @@ serve(async (req: Request) => {
       .single();
 
     if (paymentError || !payment) {
-      return new Response(
-        JSON.stringify({ error: "Payment record not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Payment record not found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Check if already paid (idempotent)
     if (payment.status === "paid") {
-      return new Response(
-        JSON.stringify({ success: true, message: "Payment already verified" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ success: true, message: "Payment already verified" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update payment record
@@ -196,10 +195,10 @@ serve(async (req: Request) => {
 
     if (updatePaymentError) {
       console.error("Update payment error:", updatePaymentError);
-      return new Response(
-        JSON.stringify({ error: "Failed to update payment" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Failed to update payment" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Update order status
@@ -213,10 +212,10 @@ serve(async (req: Request) => {
 
     if (updateOrderError) {
       console.error("Update order error:", updateOrderError);
-      return new Response(
-        JSON.stringify({ error: "Failed to update order" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Failed to update order" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(
@@ -225,13 +224,13 @@ serve(async (req: Request) => {
         order_id,
         payment_status: "paid",
       }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
     console.error("verify-razorpay-payment error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

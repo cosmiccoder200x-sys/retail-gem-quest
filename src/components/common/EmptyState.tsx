@@ -20,7 +20,9 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center rounded-3xl bg-card p-10 text-center ring-1 ring-border ${className ?? ""}`}>
+    <div
+      className={`flex flex-col items-center justify-center rounded-3xl bg-card p-10 text-center ring-1 ring-border ${className ?? ""}`}
+    >
       {icon && <div className="mb-4 text-muted-foreground">{icon}</div>}
       <h3 className="font-display text-xl font-semibold">{title}</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>

@@ -2,16 +2,16 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://gullygadget.com",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "https://gullygadget.com",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // Verify Razorpay webhook signature
 async function verifyWebhookSignature(
   body: string,
   signature: string,
-  secret: string
+  secret: string,
 ): Promise<boolean> {
   const encoder = new TextEncoder();
   const key = encoder.encode(secret);
@@ -22,7 +22,7 @@ async function verifyWebhookSignature(
     key,
     { name: "HMAC", hash: "SHA-256" },
     false,
-    ["sign"]
+    ["sign"],
   );
   const sigBuffer = await crypto.subtle.sign("HMAC", cryptoKey, data);
   const generatedSignature = Array.from(new Uint8Array(sigBuffer))
@@ -52,18 +52,18 @@ serve(async (req: Request) => {
 
     if (!razorpayWebhookSecret) {
       console.error("RAZORPAY_WEBHOOK_SECRET not configured — rejecting webhook");
-      return new Response(
-        JSON.stringify({ error: "Webhook not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     const isValid = await verifyWebhookSignature(rawBody, signature, razorpayWebhookSecret);
     if (!isValid) {
       console.error("Invalid webhook signature");
-      return new Response(
-        JSON.stringify({ error: "Invalid signature" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid signature" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const event = JSON.parse(rawBody);
@@ -93,22 +93,21 @@ serve(async (req: Request) => {
         console.log(`Unhandled webhook event: ${event.event}`);
     }
 
-    return new Response(
-      JSON.stringify({ received: true }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("razorpay-webhook error:", err);
-    return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
 
 async function handlePaymentCaptured(
   supabase: ReturnType<typeof createClient>,
-  payment: Record<string, unknown>
+  payment: Record<string, unknown>,
 ) {
   const razorpayOrderId = payment.order_id as string;
   const razorpayPaymentId = payment.id as string;
@@ -129,15 +128,25 @@ async function handlePaymentCaptured(
     return;
   }
   // Prevent downgrade: if already failed, don't auto-mark paid? Allow upgrade failed->paid
-  const { data: order } = await supabase.from("orders").select("total, payment_status, status, fulfillment_status").eq("id", existingPayment.order_id).single();
+  const { data: order } = await supabase
+    .from("orders")
+    .select("total, payment_status, status, fulfillment_status")
+    .eq("id", existingPayment.order_id)
+    .single();
   if (!order) return;
-  if (order.fulfillment_status === "cancelled" || order.fulfillment_status === "delivered" || order.status === "cancelled") {
+  if (
+    order.fulfillment_status === "cancelled" ||
+    order.fulfillment_status === "delivered" ||
+    order.status === "cancelled"
+  ) {
     console.log("Order in terminal state, skipping capture:", razorpayOrderId);
     return;
   }
   const expectedPaise = Math.round(Number(order.total) * 100);
   if (payment.amount !== undefined && Number(payment.amount) !== expectedPaise) {
-    console.error(`Amount mismatch for ${razorpayOrderId}: got ${payment.amount}, expected ${expectedPaise}`);
+    console.error(
+      `Amount mismatch for ${razorpayOrderId}: got ${payment.amount}, expected ${expectedPaise}`,
+    );
     return;
   }
   await supabase
@@ -166,7 +175,7 @@ async function handlePaymentCaptured(
 
 async function handlePaymentFailed(
   supabase: ReturnType<typeof createClient>,
-  payment: Record<string, unknown>
+  payment: Record<string, unknown>,
 ) {
   const razorpayOrderId = payment.order_id as string;
 
@@ -217,7 +226,7 @@ async function handlePaymentFailed(
 
 async function handleOrderPaid(
   supabase: ReturnType<typeof createClient>,
-  razorpayOrder: Record<string, unknown>
+  razorpayOrder: Record<string, unknown>,
 ) {
   const razorpayOrderId = razorpayOrder.id as string;
 

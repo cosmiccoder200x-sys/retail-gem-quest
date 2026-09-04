@@ -29,23 +29,54 @@ function NotFoundComponent() {
       <div className="max-w-md w-full text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">The page you're looking for doesn't exist or has been moved.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const q = (e.currentTarget as HTMLFormElement).elements.namedItem("q") as HTMLInputElement;
+            const q = (e.currentTarget as HTMLFormElement).elements.namedItem(
+              "q",
+            ) as HTMLInputElement;
             if (q?.value) window.location.href = `/products?q=${encodeURIComponent(q.value)}`;
           }}
           className="mt-6 flex gap-2"
         >
-          <label htmlFor="404-search" className="sr-only">Search products</label>
-          <input id="404-search" name="q" placeholder="Search products…" className="flex-1 rounded-full border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring" />
-          <button type="submit" className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring">Search</button>
+          <label htmlFor="404-search" className="sr-only">
+            Search products
+          </label>
+          <input
+            id="404-search"
+            name="q"
+            placeholder="Search products…"
+            className="flex-1 rounded-full border border-input bg-background px-4 py-2.5 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <button
+            type="submit"
+            className="rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Search
+          </button>
         </form>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <Link to="/" className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring">Home</Link>
-          <Link to="/products" className="inline-flex items-center justify-center rounded-full border border-input bg-background px-5 py-2.5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring">Back to shop</Link>
-          <Link to="/contact" className="inline-flex items-center justify-center rounded-full border border-input bg-background px-5 py-2.5 text-sm font-medium hover:bg-accent">Contact support</Link>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Home
+          </Link>
+          <Link
+            to="/products"
+            className="inline-flex items-center justify-center rounded-full border border-input bg-background px-5 py-2.5 text-sm font-medium hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Back to shop
+          </Link>
+          <Link
+            to="/contact"
+            className="inline-flex items-center justify-center rounded-full border border-input bg-background px-5 py-2.5 text-sm font-medium hover:bg-accent"
+          >
+            Contact support
+          </Link>
         </div>
       </div>
     </div>
@@ -169,4 +200,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

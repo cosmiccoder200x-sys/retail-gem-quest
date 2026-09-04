@@ -17,38 +17,20 @@ import { toast } from "sonner";
 
 declare global {
   interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void; on: (e: string, h: (r: unknown) => void) => void };
+    Razorpay: any;
   }
 }
 
 export const Route = createFileRoute("/_authenticated/account")({
-  head: () => ({ meta: [{ title: "My Account — GullyGadget" }] }),
+  head: () => ({
+    meta: [{ title: "My Account — GullyGadget" }, { name: "robots", content: "noindex, nofollow" }],
+  }),
   component: Account,
 });
 
 function Account() {
   const { user, loading: authLoading } = useAuth();
 
-  if (authLoading) {
-    return (
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-secondary rounded w-48" />
-          <div className="h-4 bg-secondary rounded w-32" />
-          <div className="flex gap-2 mt-6">
-            <div className="h-10 bg-secondary rounded w-20" />
-            <div className="h-10 bg-secondary rounded w-20" />
-            <div className="h-10 bg-secondary rounded w-20" />
-          </div>
-          <div className="space-y-3 mt-6">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="h-24 bg-secondary rounded-3xl" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
   const qc = useQueryClient();
   const { data: wishlist } = useWishlist(!!user);
   const addToCart = useAddToCart();
@@ -60,7 +42,13 @@ function Account() {
 
   // Address state
   const [addressForm, setAddressForm] = useState({
-    full_name: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "",
+    full_name: "",
+    phone: "",
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    pincode: "",
   });
   const [editingAddress, setEditingAddress] = useState<string | null>(null);
 
@@ -79,7 +67,10 @@ function Account() {
     queryKey: ["addresses", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("addresses").select("*").order("is_default", { ascending: false });
+      const { data } = await supabase
+        .from("addresses")
+        .select("*")
+        .order("is_default", { ascending: false });
       return data ?? [];
     },
   });
@@ -103,7 +94,10 @@ function Account() {
       if (!profileForm.full_name.trim()) throw new Error("Name is required");
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: profileForm.full_name.trim(), phone: profileForm.phone.trim() || null })
+        .update({
+          full_name: profileForm.full_name.trim(),
+          phone: profileForm.phone.trim() || null,
+        })
         .eq("id", user!.id);
       if (error) throw error;
     },
@@ -118,8 +112,14 @@ function Account() {
   // Save address mutation
   const saveAddress = useMutation({
     mutationFn: async () => {
-      if (!addressForm.full_name.trim() || !addressForm.phone.trim() || !addressForm.line1.trim() ||
-          !addressForm.city.trim() || !addressForm.state.trim() || !addressForm.pincode.trim()) {
+      if (
+        !addressForm.full_name.trim() ||
+        !addressForm.phone.trim() ||
+        !addressForm.line1.trim() ||
+        !addressForm.city.trim() ||
+        !addressForm.state.trim() ||
+        !addressForm.pincode.trim()
+      ) {
         throw new Error("All required fields must be filled");
       }
       const payload = {
@@ -144,7 +144,15 @@ function Account() {
     onSuccess: () => {
       toast.success(editingAddress ? "Address updated" : "Address saved");
       setEditingAddress(null);
-      setAddressForm({ full_name: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "" });
+      setAddressForm({
+        full_name: "",
+        phone: "",
+        line1: "",
+        line2: "",
+        city: "",
+        state: "",
+        pincode: "",
+      });
       qc.invalidateQueries({ queryKey: ["addresses"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -190,7 +198,7 @@ function Account() {
               apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             },
             body: JSON.stringify({ order_id: orderId }),
-          }
+          },
         );
         if (!res.ok) {
           const err = await res.json();
@@ -198,9 +206,17 @@ function Account() {
         }
         const { razorpay_order_id, amount, currency, key_id } = await res.json();
         const rzp = new window.Razorpay({
-          key: key_id, amount, currency, name: "GullyGadget",
-          description: `Order #${orderId.slice(0, 8)}`, order_id: razorpay_order_id,
-          handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+          key: key_id,
+          amount,
+          currency,
+          name: "GullyGadget",
+          description: `Order #${orderId.slice(0, 8)}`,
+          order_id: razorpay_order_id,
+          handler: async (response: {
+            razorpay_order_id: string;
+            razorpay_payment_id: string;
+            razorpay_signature: string;
+          }) => {
             try {
               const verifyRes = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-razorpay-payment`,
@@ -217,7 +233,7 @@ function Account() {
                     razorpay_signature: response.razorpay_signature,
                     order_id: orderId,
                   }),
-                }
+                },
               );
               if (!verifyRes.ok) throw new Error("Verification failed");
               qc.invalidateQueries({ queryKey: ["orders"] });
@@ -229,7 +245,12 @@ function Account() {
           },
           prefill: { email: user?.email ?? "" },
           theme: { color: "#0891b2" },
-          modal: { ondismiss: () => { toast.info("Payment cancelled. You can retry anytime."); setRetryingId(null); } },
+          modal: {
+            ondismiss: () => {
+              toast.info("Payment cancelled. You can retry anytime.");
+              setRetryingId(null);
+            },
+          },
         });
         rzp.on("payment.failed", (response: { error: { description: string } }) => {
           toast.error(`Payment failed: ${response.error.description}`);
@@ -241,8 +262,29 @@ function Account() {
         setRetryingId(null);
       }
     },
-    [retryingId, user?.email, qc]
+    [retryingId, user?.email, qc],
   );
+
+  if (authLoading) {
+    return (
+      <div className="mx-auto max-w-6xl px-6 py-12">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-secondary rounded w-48" />
+          <div className="h-4 bg-secondary rounded w-32" />
+          <div className="flex gap-2 mt-6">
+            <div className="h-10 bg-secondary rounded w-20" />
+            <div className="h-10 bg-secondary rounded w-20" />
+            <div className="h-10 bg-secondary rounded w-20" />
+          </div>
+          <div className="space-y-3 mt-6">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="h-24 bg-secondary rounded-3xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-12">
@@ -268,27 +310,49 @@ function Account() {
             />
           )}
           {(orders ?? []).map((o) => {
-            const isUnpaid = o.payment_method === "online" && o.payment_status !== "paid" && o.status !== "cancelled";
+            const isUnpaid =
+              o.payment_method === "online" &&
+              o.payment_status !== "paid" &&
+              o.status !== "cancelled";
             const hasTracking = !!o.tracking_number;
             return (
               <div key={o.id} className="rounded-3xl bg-white p-6 ring-1 ring-border">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Order</p>
-                    <Link to="/order-confirmation/$orderId" params={{ orderId: o.id }} className="font-mono text-sm hover:text-accent-cyan">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      Order
+                    </p>
+                    <Link
+                      to="/order-confirmation/$orderId"
+                      params={{ orderId: o.id }}
+                      className="font-mono text-sm hover:text-accent-cyan"
+                    >
                       #{o.order_number || o.id.slice(0, 8)}
                     </Link>
                   </div>
-                  <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-bold uppercase text-brand capitalize">{o.status}</span>
-                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full capitalize">{o.payment_method === "cod" ? "COD" : "Online"}</span>
-                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full capitalize">{o.payment_status}</span>
-                  <span className="text-sm text-muted-foreground">{new Date(o.created_at).toLocaleDateString()}</span>
+                  <span className="rounded-full bg-brand-soft px-3 py-1 text-xs font-bold uppercase text-brand capitalize">
+                    {o.status}
+                  </span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full capitalize">
+                    {o.payment_method === "cod" ? "COD" : "Online"}
+                  </span>
+                  <span className="text-xs bg-muted px-2 py-0.5 rounded-full capitalize">
+                    {o.payment_status}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(o.created_at).toLocaleDateString()}
+                  </span>
                   <span className="font-display text-xl italic">{formatINR(Number(o.total))}</span>
                 </div>
                 <div className="space-y-1 text-sm">
                   {o.order_items?.map((it: Record<string, unknown>) => (
-                    <div key={it.id as string} className="flex justify-between text-muted-foreground">
-                      <span>{it.product_name as string} × {it.quantity as number}</span>
+                    <div
+                      key={it.id as string}
+                      className="flex justify-between text-muted-foreground"
+                    >
+                      <span>
+                        {it.product_name as string} × {it.quantity as number}
+                      </span>
                       <span>{formatINR((it.price as number) * (it.quantity as number))}</span>
                     </div>
                   ))}
@@ -323,8 +387,17 @@ function Account() {
                 )}
                 {isUnpaid && (
                   <div className="mt-4 pt-3 border-t border-border">
-                    <Button size="sm" onClick={() => retryPayment(o.id)} disabled={retryingId === o.id} className="rounded-full bg-brand hover:bg-accent-cyan">
-                      {retryingId === o.id ? <RefreshCw className="mr-2 size-3 animate-spin" /> : <CreditCard className="mr-2 size-3" />}
+                    <Button
+                      size="sm"
+                      onClick={() => retryPayment(o.id)}
+                      disabled={retryingId === o.id}
+                      className="rounded-full bg-brand hover:bg-accent-cyan"
+                    >
+                      {retryingId === o.id ? (
+                        <RefreshCw className="mr-2 size-3 animate-spin" />
+                      ) : (
+                        <CreditCard className="mr-2 size-3" />
+                      )}
                       Retry Payment
                     </Button>
                   </div>
@@ -360,7 +433,12 @@ function Account() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => updateProfile.mutate()} disabled={updateProfile.isPending} className="rounded-full">
+                  <Button
+                    size="sm"
+                    onClick={() => updateProfile.mutate()}
+                    disabled={updateProfile.isPending}
+                    className="rounded-full"
+                  >
                     Save
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditingProfile(false)}>
@@ -370,13 +448,29 @@ function Account() {
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm"><span className="text-muted-foreground">Name:</span> {profile?.full_name || "Not set"}</p>
-                <p className="text-sm"><span className="text-muted-foreground">Phone:</span> {profile?.phone || "Not set"}</p>
-                <p className="text-sm"><span className="text-muted-foreground">Email:</span> {user?.email}</p>
-                <Button size="sm" variant="outline" className="mt-3 rounded-full" onClick={() => {
-                  setProfileForm({ full_name: profile?.full_name ?? "", phone: profile?.phone ?? "" });
-                  setEditingProfile(true);
-                }}>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Name:</span>{" "}
+                  {profile?.full_name || "Not set"}
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Phone:</span>{" "}
+                  {profile?.phone || "Not set"}
+                </p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">Email:</span> {user?.email}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 rounded-full"
+                  onClick={() => {
+                    setProfileForm({
+                      full_name: profile?.full_name ?? "",
+                      phone: profile?.phone ?? "",
+                    });
+                    setEditingProfile(true);
+                  }}
+                >
                   Edit Profile
                 </Button>
               </div>
@@ -394,39 +488,81 @@ function Account() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <Label>Full Name *</Label>
-                <Input value={addressForm.full_name} onChange={(e) => setAddressForm({ ...addressForm, full_name: e.target.value })} />
+                <Input
+                  value={addressForm.full_name}
+                  onChange={(e) => setAddressForm({ ...addressForm, full_name: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Phone *</Label>
-                <Input type="tel" value={addressForm.phone} onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })} />
+                <Input
+                  type="tel"
+                  value={addressForm.phone}
+                  onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label>Address Line 1 *</Label>
-                <Input value={addressForm.line1} onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })} />
+                <Input
+                  value={addressForm.line1}
+                  onChange={(e) => setAddressForm({ ...addressForm, line1: e.target.value })}
+                />
               </div>
               <div className="sm:col-span-2">
                 <Label>Line 2</Label>
-                <Input value={addressForm.line2} onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })} />
+                <Input
+                  value={addressForm.line2}
+                  onChange={(e) => setAddressForm({ ...addressForm, line2: e.target.value })}
+                />
               </div>
               <div>
                 <Label>City *</Label>
-                <Input value={addressForm.city} onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })} />
+                <Input
+                  value={addressForm.city}
+                  onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                />
               </div>
               <div>
                 <Label>State *</Label>
-                <Input value={addressForm.state} onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })} />
+                <Input
+                  value={addressForm.state}
+                  onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                />
               </div>
               <div>
                 <Label>Pincode *</Label>
-                <Input value={addressForm.pincode} onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })} />
+                <Input
+                  value={addressForm.pincode}
+                  onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <Button size="sm" onClick={() => saveAddress.mutate()} disabled={saveAddress.isPending} className="rounded-full">
+              <Button
+                size="sm"
+                onClick={() => saveAddress.mutate()}
+                disabled={saveAddress.isPending}
+                className="rounded-full"
+              >
                 {editingAddress ? "Update" : "Save"} Address
               </Button>
               {editingAddress && (
-                <Button size="sm" variant="ghost" onClick={() => { setEditingAddress(null); setAddressForm({ full_name: "", phone: "", line1: "", line2: "", city: "", state: "", pincode: "" }); }}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setAddressForm({
+                      full_name: "",
+                      phone: "",
+                      line1: "",
+                      line2: "",
+                      city: "",
+                      state: "",
+                      pincode: "",
+                    });
+                  }}
+                >
                   Cancel
                 </Button>
               )}
@@ -436,19 +572,53 @@ function Account() {
           {/* Saved Addresses */}
           <div className="space-y-3">
             {(addresses ?? []).map((addr) => (
-              <div key={addr.id} className="rounded-2xl bg-white p-4 ring-1 ring-border flex items-start justify-between">
+              <div
+                key={addr.id}
+                className="rounded-2xl bg-white p-4 ring-1 ring-border flex items-start justify-between"
+              >
                 <div className="text-sm">
-                  <p className="font-bold">{addr.full_name} {addr.is_default && <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
-                  <p className="text-muted-foreground">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</p>
-                  <p className="text-muted-foreground">{addr.city}, {addr.state} - {addr.pincode}</p>
+                  <p className="font-bold">
+                    {addr.full_name}{" "}
+                    {addr.is_default && (
+                      <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full ml-1">
+                        Default
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {addr.line1}
+                    {addr.line2 ? `, ${addr.line2}` : ""}
+                  </p>
+                  <p className="text-muted-foreground">
+                    {addr.city}, {addr.state} - {addr.pincode}
+                  </p>
                   <p className="text-muted-foreground">Phone: {addr.phone}</p>
                 </div>
                 <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => {
-                    setEditingAddress(addr.id);
-                    setAddressForm({ full_name: addr.full_name, phone: addr.phone, line1: addr.line1, line2: addr.line2 ?? "", city: addr.city, state: addr.state, pincode: addr.pincode });
-                  }}>Edit</Button>
-                  <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteAddress.mutate(addr.id)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setEditingAddress(addr.id);
+                      setAddressForm({
+                        full_name: addr.full_name,
+                        phone: addr.phone,
+                        line1: addr.line1,
+                        line2: addr.line2 ?? "",
+                        city: addr.city,
+                        state: addr.state,
+                        pincode: addr.pincode,
+                      });
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => deleteAddress.mutate(addr.id)}
+                  >
                     <Trash2 className="size-3" />
                   </Button>
                 </div>
@@ -468,18 +638,47 @@ function Account() {
             />
           )}
           {(wishlist ?? []).map((w) => {
-            const p = w.product as { id: string; name: string; slug: string; price: number; mrp: number | null; image_url: string | null };
+            const p = w.product as {
+              id: string;
+              name: string;
+              slug: string;
+              price: number;
+              mrp: number | null;
+              image_url: string | null;
+            };
             return (
               <div key={w.id} className="flex gap-3 rounded-2xl bg-white p-3 ring-1 ring-border">
-                <Link to="/products/$slug" params={{ slug: p.slug }} className="size-20 shrink-0 overflow-hidden rounded-xl bg-background">
+                <Link
+                  to="/products/$slug"
+                  params={{ slug: p.slug }}
+                  className="size-20 shrink-0 overflow-hidden rounded-xl bg-background"
+                >
                   <ProductTile name={p.name} imageUrl={p.image_url} />
                 </Link>
                 <div className="flex flex-1 flex-col">
-                  <Link to="/products/$slug" params={{ slug: p.slug }} className="font-bold hover:text-accent-cyan line-clamp-1">{p.name}</Link>
+                  <Link
+                    to="/products/$slug"
+                    params={{ slug: p.slug }}
+                    className="font-bold hover:text-accent-cyan line-clamp-1"
+                  >
+                    {p.name}
+                  </Link>
                   <p className="font-display italic">{formatINR(p.price)}</p>
                   <div className="mt-auto flex gap-2">
-                    <Button size="sm" onClick={() => addToCart.mutate({ product_id: p.id })} className="flex-1 rounded-full"><ShoppingBag className="size-3" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => toggleWish.mutate({ product_id: w.product_id })}><Trash2 className="size-3" /></Button>
+                    <Button
+                      size="sm"
+                      onClick={() => addToCart.mutate({ product_id: p.id })}
+                      className="flex-1 rounded-full"
+                    >
+                      <ShoppingBag className="size-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => toggleWish.mutate({ product_id: w.product_id })}
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
                   </div>
                 </div>
               </div>

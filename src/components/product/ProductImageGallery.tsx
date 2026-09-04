@@ -11,9 +11,7 @@ export function ProductImageGallery({
   const [active, setActive] = useState(0);
 
   if (!images || images.length === 0) {
-    return (
-      <div className="aspect-square rounded-3xl bg-secondary shimmer" />
-    );
+    return <div className="aspect-square rounded-3xl bg-secondary shimmer" />;
   }
 
   return (

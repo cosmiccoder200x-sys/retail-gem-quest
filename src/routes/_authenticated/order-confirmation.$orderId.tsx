@@ -9,7 +9,12 @@ import { CheckCircle, ShoppingBag, Truck, CreditCard } from "lucide-react";
 import { OrderTimeline } from "@/components/orders/OrderTimeline";
 
 export const Route = createFileRoute("/_authenticated/order-confirmation/$orderId")({
-  head: () => ({ meta: [{ title: "Order Confirmed — GullyGadget" }] }),
+  head: () => ({
+    meta: [
+      { title: "Order Confirmed — GullyGadget" },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
   component: OrderConfirmation,
 });
 
@@ -52,7 +57,9 @@ function OrderConfirmation() {
           We couldn't find this order. Check your account for all orders.
         </p>
         <Button asChild className="mt-4 rounded-full">
-          <Link to="/account" hash="orders">View My Orders</Link>
+          <Link to="/account" hash="orders">
+            View My Orders
+          </Link>
         </Button>
       </div>
     );
@@ -67,7 +74,9 @@ function OrderConfirmation() {
     <div className="mx-auto max-w-2xl px-6 py-12">
       {/* Success Header */}
       <div className="text-center mb-8">
-        <CheckCircle className={`mx-auto size-16 ${isPaid || isCOD ? "text-success" : "text-muted-foreground"}`} />
+        <CheckCircle
+          className={`mx-auto size-16 ${isPaid || isCOD ? "text-success" : "text-muted-foreground"}`}
+        />
         <h1 className="mt-4 font-display text-3xl uppercase">
           {isPaid ? "Payment Successful" : isCOD ? "Order Confirmed" : "Order Placed"}
         </h1>
@@ -75,14 +84,16 @@ function OrderConfirmation() {
           {isCOD
             ? "Cash on Delivery — pay when your order arrives."
             : isPaid
-            ? "Your payment has been received and verified."
-            : "Your order has been placed. Complete payment to confirm."}
+              ? "Your payment has been received and verified."
+              : "Your order has been placed. Complete payment to confirm."}
         </p>
       </div>
 
       {/* Timeline */}
       <div className="rounded-3xl bg-white p-6 ring-1 ring-brand/5 mb-6">
-        <h2 className="font-display text-sm uppercase tracking-widest text-muted-foreground mb-4">Order Progress</h2>
+        <h2 className="font-display text-sm uppercase tracking-widest text-muted-foreground mb-4">
+          Order Progress
+        </h2>
         <OrderTimeline
           createdAt={order.created_at}
           forwardedAt={order.forwarded_at}
@@ -139,7 +150,7 @@ function OrderConfirmation() {
         <div className="border-t border-border pt-4">
           <h3 className="font-bold text-sm mb-3">Items</h3>
           <div className="space-y-2">
-            {order.order_items?.map((item: Record<string, unknown>) => (
+            {order.order_items?.map((item: any) => (
               <div key={item.id as string} className="flex justify-between text-sm">
                 <div className="flex items-center gap-2">
                   {item.product_image && (

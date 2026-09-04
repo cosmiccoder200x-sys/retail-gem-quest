@@ -23,10 +23,15 @@ export function StarRating({
             type="button"
             disabled={!interactive}
             onClick={() => interactive && onChange?.(n)}
-            className={cn(interactive ? "cursor-pointer hover:scale-110 transition" : "cursor-default", "p-0.5")}
+            className={cn(
+              interactive ? "cursor-pointer hover:scale-110 transition" : "cursor-default",
+              "p-0.5",
+            )}
             aria-label={`${n} star`}
           >
-            <Star className={cn(sizeCls, filled ? "fill-offer text-offer" : "text-muted-foreground/30")} />
+            <Star
+              className={cn(sizeCls, filled ? "fill-offer text-offer" : "text-muted-foreground/30")}
+            />
           </button>
         );
       })}

@@ -17,9 +17,7 @@ export function ErrorState({
       <div className="grid size-16 place-items-center rounded-full bg-destructive/10 text-destructive">
         <RefreshCw className="size-8" aria-hidden="true" />
       </div>
-      <h3 className="mt-4 font-display text-xl font-semibold">
-        {title ?? "Something went wrong"}
-      </h3>
+      <h3 className="mt-4 font-display text-xl font-semibold">{title ?? "Something went wrong"}</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
         {message ?? "We encountered an issue loading this content. Please try again."}
       </p>

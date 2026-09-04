@@ -9,13 +9,22 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
-const authSearch = z.object({ mode: z.enum(["signin", "signup"]).optional(), redirect: z.string().optional() });
-const signupSchema = z.object({ name: z.string().min(2).max(80), email: z.string().email(), password: z.string().min(6) });
+const authSearch = z.object({
+  mode: z.enum(["signin", "signup"]).optional(),
+  redirect: z.string().optional(),
+});
+const signupSchema = z.object({
+  name: z.string().min(2).max(80),
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 const signinSchema = z.object({ email: z.string().email(), password: z.string().min(6) });
 
 export const Route = createFileRoute("/auth")({
   validateSearch: authSearch,
-  head: () => ({ meta: [{ title: "Sign in — GullyGadget" }] }),
+  head: () => ({
+    meta: [{ title: "Sign in — GullyGadget" }, { name: "robots", content: "noindex, nofollow" }],
+  }),
   component: AuthPage,
 });
 
@@ -79,10 +88,16 @@ function AuthPage() {
     <div className="mx-auto max-w-md px-6 py-16">
       <div className="rounded-3xl bg-white p-8 ring-1 ring-brand/5">
         <h1 className="mb-2 font-display text-3xl uppercase">Welcome</h1>
-        <p className="mb-6 text-sm text-muted-foreground">Sign in to shop, track orders & save favourites</p>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Sign in to shop, track orders & save favourites
+        </p>
 
-        <Button onClick={google} variant="outline" className="mb-4 w-full rounded-full">Continue with Google</Button>
-        <div className="mb-4 text-center text-xs uppercase tracking-widest text-muted-foreground">or</div>
+        <Button onClick={google} variant="outline" className="mb-4 w-full rounded-full">
+          Continue with Google
+        </Button>
+        <div className="mb-4 text-center text-xs uppercase tracking-widest text-muted-foreground">
+          or
+        </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as "signin" | "signup")}>
           <TabsList className="grid w-full grid-cols-2">
@@ -130,14 +145,20 @@ function AuthPage() {
                 </button>
               </div>
             </div>
-            <Button type="submit" disabled={busy} className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
+            <Button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan"
+            >
               {busy ? "Please wait…" : tab === "signup" ? "Create Account" : "Sign In"}
             </Button>
           </form>
         </Tabs>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          <Link to="/" className="hover:underline">← Back to store</Link>
+          <Link to="/" className="hover:underline">
+            ← Back to store
+          </Link>
         </p>
       </div>
     </div>

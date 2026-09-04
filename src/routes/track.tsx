@@ -86,7 +86,8 @@ function TrackPage() {
     <div className="mx-auto max-w-2xl px-4 py-12">
       <h1 className="text-3xl font-bold tracking-tight">Track your order</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Enter the order ID or order number from your confirmation email and the email used at checkout.
+        Enter the order ID or order number from your confirmation email and the email used at
+        checkout.
       </p>
 
       <Card className="mt-6 p-6">
@@ -128,12 +129,18 @@ function TrackPage() {
             <div>
               <div className="text-xs uppercase text-muted-foreground">Order</div>
               <div className="font-mono text-sm">{result.order_number ?? result.id}</div>
-              {result.order_number && <div className="font-mono text-xs text-muted-foreground">{result.id.slice(0, 8)}</div>}
+              {result.order_number && (
+                <div className="font-mono text-xs text-muted-foreground">
+                  {result.id.slice(0, 8)}
+                </div>
+              )}
             </div>
             <div className="text-right">
               <div className="text-xs uppercase text-muted-foreground">Total</div>
               <div className="font-semibold">{formatINR(Number(result.total))}</div>
-              <div className="text-xs text-muted-foreground capitalize">{result.payment_method} · {result.payment_status}</div>
+              <div className="text-xs text-muted-foreground capitalize">
+                {result.payment_method} · {result.payment_status}
+              </div>
             </div>
           </div>
 

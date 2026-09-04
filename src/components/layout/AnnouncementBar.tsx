@@ -10,9 +10,13 @@ export function AnnouncementBar() {
             </span>
             Free Shipping on Orders ₹499+
           </span>
-          <span className="text-border" aria-hidden="true">|</span>
+          <span className="text-border" aria-hidden="true">
+            |
+          </span>
           <span>Cash on Delivery Available Across India</span>
-          <span className="text-border" aria-hidden="true">|</span>
+          <span className="text-border" aria-hidden="true">
+            |
+          </span>
           <span>7-Day Easy Replacement</span>
         </div>
       </div>

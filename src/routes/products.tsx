@@ -5,7 +5,13 @@ import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { ProductGrid } from "@/components/product/ProductGrid";
@@ -33,9 +39,9 @@ export const Route = createFileRoute("/products")({
     meta: [
       { title: "Shop All — GullyGadget" },
       { name: "description", content: "Browse trending home appliance gadgets under ₹1000." },
-      { property: "og:url", content: "/products" },
+      { property: "og:url", content: "https://gullygadget.com/products" },
     ],
-    links: [{ rel: "canonical", href: "/products" }],
+    links: [{ rel: "canonical", href: "https://gullygadget.com/products" }],
   }),
   component: Catalog,
 });
@@ -67,9 +73,15 @@ function Catalog() {
   const { data: categoryCounts } = useQuery({
     queryKey: ["category-counts"],
     queryFn: async () => {
-      const { data: cats } = await supabase.from("categories").select("id, slug").eq("is_active", true);
+      const { data: cats } = await supabase
+        .from("categories")
+        .select("id, slug")
+        .eq("is_active", true);
       if (!cats) return {} as Record<string, number>;
-      const { data: products } = await supabase.from("products").select("category_id").eq("is_active", true);
+      const { data: products } = await supabase
+        .from("products")
+        .select("category_id")
+        .eq("is_active", true);
       const counts: Record<string, number> = {};
       for (const cat of cats) counts[cat.slug] = 0;
       for (const p of products ?? []) {
@@ -83,7 +95,11 @@ function Catalog() {
   const activeCategory = categories?.find((c) => c.slug === search.category);
 
   // Build products query with all filters
-  const { data: result, isPending, error } = useQuery({
+  const {
+    data: result,
+    isPending,
+    error,
+  } = useQuery({
     queryKey: ["products", search],
     queryFn: async () => {
       // Need category_id for category filter
@@ -103,7 +119,7 @@ function Catalog() {
         .from("products")
         .select(
           "id, name, slug, short_description, price, mrp, image_url, rating, review_count, badge, stock, is_featured, category_id",
-          { count: "exact" }
+          { count: "exact" },
         )
         .eq("is_active", true);
 
@@ -153,7 +169,10 @@ function Catalog() {
 
   // Helpers to update URL via TanStack Router
   const updateSearch = (patch: Record<string, unknown>) => {
-    const next = { ...search, ...patch, page: patch.page !== undefined ? patch.page : 1 } as Record<string, unknown>;
+    const next = { ...search, ...patch, page: patch.page !== undefined ? patch.page : 1 } as Record<
+      string,
+      unknown
+    >;
     // Remove undefined/null/empty values
     for (const k of Object.keys(next)) {
       if (next[k] === undefined || next[k] === "" || next[k] === false) delete next[k];
@@ -175,7 +194,12 @@ function Catalog() {
   };
 
   const hasActiveFilters =
-    !!search.category || !!search.q || search.min !== undefined || search.max !== undefined || !!search.inStock || !!search.featured;
+    !!search.category ||
+    !!search.q ||
+    search.min !== undefined ||
+    search.max !== undefined ||
+    !!search.inStock ||
+    !!search.featured;
 
   const activeFilterCount = [
     search.category,
@@ -236,10 +260,7 @@ function Catalog() {
         </form>
 
         <div className="flex items-center gap-2">
-          <Select
-            value={search.sort ?? "newest"}
-            onValueChange={(v) => updateSearch({ sort: v })}
-          >
+          <Select value={search.sort ?? "newest"} onValueChange={(v) => updateSearch({ sort: v })}>
             <SelectTrigger className="w-44 rounded-full">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
@@ -292,7 +313,12 @@ function Catalog() {
           </span>
         )}
         {hasActiveFilters && (
-          <Button variant="ghost" size="sm" className="rounded-full h-7 text-xs" onClick={clearAllFilters}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full h-7 text-xs"
+            onClick={clearAllFilters}
+          >
             <X className="size-3 mr-1" /> Clear all
           </Button>
         )}
@@ -302,10 +328,19 @@ function Catalog() {
       {hasActiveFilters && (
         <div className="mb-4 flex flex-wrap gap-2">
           {search.category && (
-            <FilterPill label={activeCategory?.name ?? search.category} onRemove={() => updateSearch({ category: undefined })} />
+            <FilterPill
+              label={activeCategory?.name ?? search.category}
+              onRemove={() => updateSearch({ category: undefined })}
+            />
           )}
           {search.q && (
-            <FilterPill label={`Search: "${search.q}"`} onRemove={() => { setLocalQ(""); updateSearch({ q: undefined }); }} />
+            <FilterPill
+              label={`Search: "${search.q}"`}
+              onRemove={() => {
+                setLocalQ("");
+                updateSearch({ q: undefined });
+              }}
+            />
           )}
           {(search.min !== undefined || search.max !== undefined) && (
             <FilterPill
@@ -389,7 +424,11 @@ function FilterPill({ label, onRemove }: { label: string; onRemove: () => void }
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-3 py-1 text-xs font-medium text-brand">
       {label}
-      <button onClick={onRemove} className="ml-1 rounded-full hover:bg-brand/10 p-0.5" aria-label={`Remove ${label}`}>
+      <button
+        onClick={onRemove}
+        className="ml-1 rounded-full hover:bg-brand/10 p-0.5"
+        aria-label={`Remove ${label}`}
+      >
         <X className="size-3" />
       </button>
     </span>
@@ -485,7 +524,12 @@ function FilterContent({
             size="sm"
             variant="outline"
             className="w-full rounded-full"
-            onClick={() => onUpdate({ min: localMin || undefined, max: localMax === 2000 ? undefined : localMax })}
+            onClick={() =>
+              onUpdate({
+                min: localMin || undefined,
+                max: localMax === 2000 ? undefined : localMax,
+              })
+            }
           >
             Apply
           </Button>

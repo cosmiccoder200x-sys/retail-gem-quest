@@ -3,20 +3,15 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { X, Search, ShoppingBag, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTrigger,
-  DrawerClose,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerTrigger, DrawerClose } from "@/components/ui/drawer";
 import { useCart } from "@/lib/cart";
 import { useAuth } from "@/lib/auth-store";
 
 export function MobileMenu() {
   const [q, setQ] = useState("");
   const navigate = useNavigate();
-  const { data: cart } = useCart(user?.id);
   const { user } = useAuth();
+  const { data: cart } = useCart(user?.id);
   const cartCount = (cart ?? []).reduce((n, c) => n + c.quantity, 0);
 
   const submit = (e: React.FormEvent) => {
@@ -57,15 +52,26 @@ export function MobileMenu() {
           </form>
 
           <nav className="flex flex-col gap-1 px-4 pb-4">
-            <MobileLink to="/products" search={{ category: "kitchen" }}>Kitchen</MobileLink>
-            <MobileLink to="/products" search={{ category: "home-comfort" }}>Home Comfort</MobileLink>
-            <MobileLink to="/products" search={{ category: "personal-care" }}>Personal Care</MobileLink>
-            <MobileLink to="/products" search={{ category: "cleaning" }}>Cleaning</MobileLink>
+            <MobileLink to="/products" search={{ category: "kitchen" }}>
+              Kitchen
+            </MobileLink>
+            <MobileLink to="/products" search={{ category: "home-comfort" }}>
+              Home Comfort
+            </MobileLink>
+            <MobileLink to="/products" search={{ category: "personal-care" }}>
+              Personal Care
+            </MobileLink>
+            <MobileLink to="/products" search={{ category: "cleaning" }}>
+              Cleaning
+            </MobileLink>
             <MobileLink to="/products">₹999 Store</MobileLink>
           </nav>
 
           <div className="flex items-center gap-3 px-4 pb-4 pt-2 border-t border-border">
-            <button className="grid size-10 place-items-center rounded-full bg-brand/5" aria-label="Cart">
+            <button
+              className="grid size-10 place-items-center rounded-full bg-brand/5"
+              aria-label="Cart"
+            >
               <ShoppingBag className="size-5" />
             </button>
             {user ? (

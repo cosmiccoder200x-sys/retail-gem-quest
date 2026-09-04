@@ -6,165 +6,165 @@ Build a complete, production-ready e-commerce website for my business.
 
 Tech Stack
 
- Frontend: React + Tailwind CSS
+Frontend: React + Tailwind CSS
 
- Backend: Python Flask
+Backend: Python Flask
 
- Database: PostgreSQL
+Database: PostgreSQL
 
- Authentication: JWT
+Authentication: JWT
 
- Deployment: Replit-ready
+Deployment: Replit-ready
 
 Business Goals
 
- Attract new customers
+Attract new customers
 
- Showcase products professionally
+Showcase products professionally
 
- Increase conversions and sales
+Increase conversions and sales
 
- Build trust and brand credibility
+Build trust and brand credibility
 
 Core Features
 
 Homepage
 
- Modern hero section with promotional banner
+Modern hero section with promotional banner
 
- Featured products carousel
+Featured products carousel
 
- Best-selling products section
+Best-selling products section
 
- Customer testimonials
+Customer testimonials
 
- Brand story section
+Brand story section
 
- Newsletter subscription
+Newsletter subscription
 
- Call-to-action buttons
+Call-to-action buttons
 
 Product Catalog
 
- Grid and list views
+Grid and list views
 
- Product categories
+Product categories
 
- Advanced filtering
+Advanced filtering
 
- Search with autocomplete
+Search with autocomplete
 
- Product sorting
+Product sorting
 
- Pagination
+Pagination
 
 Product Pages
 
- Multiple product images
+Multiple product images
 
- Product description
+Product description
 
- Specifications
+Specifications
 
- Reviews and ratings
+Reviews and ratings
 
- Related products
+Related products
 
- Add to cart
+Add to cart
 
- Wishlist
+Wishlist
 
- Stock status
+Stock status
 
 Shopping Cart
 
- Update quantity
+Update quantity
 
- Remove products
+Remove products
 
- Coupon codes
+Coupon codes
 
- Shipping calculator
+Shipping calculator
 
- Order summary
+Order summary
 
 User Accounts
 
- Sign up
+Sign up
 
- Login
+Login
 
- Forgot password
+Forgot password
 
- Order history
+Order history
 
- Saved addresses
+Saved addresses
 
- Wishlist management
+Wishlist management
 
 Admin Dashboard
 
- Manage products
+Manage products
 
- Manage categories
+Manage categories
 
- Manage orders
+Manage orders
 
- Manage customers
+Manage customers
 
- Manage coupons
+Manage coupons
 
- Sales analytics
+Sales analytics
 
- Inventory tracking
+Inventory tracking
 
 Marketing Features
 
- SEO optimization
+SEO optimization
 
- Email marketing integration
+Email marketing integration
 
- Product recommendations
+Product recommendations
 
- Recently viewed products
+Recently viewed products
 
- Social media sharing
+Social media sharing
 
- Referral program
+Referral program
 
 Security
 
- Password hashing
+Password hashing
 
- Input validation
+Input validation
 
- CSRF protection
+CSRF protection
 
- Rate limiting
+Rate limiting
 
- Secure authentication
+Secure authentication
 
 Performance
 
- Lazy loading
+Lazy loading
 
- Image optimization
+Image optimization
 
- Fast page loading
+Fast page loading
 
- Mobile-first responsive design
+Mobile-first responsive design
 
 Design Style
 
- Premium modern UI
+Premium modern UI
 
- Inspired by leading e-commerce platforms such as Amazon, Shopify, and Apple Store
+Inspired by leading e-commerce platforms such as Amazon, Shopify, and Apple Store
 
- Clean typography
+Clean typography
 
- Smooth animations
+Smooth animations
 
- Dark and light mode
+Dark and light mode
 
 This project was built with [Lovable](https://lovable.dev).
 

@@ -15,7 +15,8 @@ type ReviewRow = {
   product_id: string;
   user_id: string;
   rating: number;
-  review_text: string;
+  comment: string | null;
+  title?: string | null;
   verified_purchase: boolean;
   is_visible: boolean;
   created_at: string;
@@ -40,7 +41,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
     queryKey: ["reviews", productId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("reviews")
+        .from("product_reviews")
         .select("*, profiles(full_name)")
         .eq("product_id", productId)
         .eq("is_visible", true)
@@ -56,16 +57,17 @@ export function ReviewsSection({ productId }: { productId: string }) {
     enabled: !!user && !!productId,
     queryFn: async () => {
       const { data } = await supabase
-        .from("reviews")
+        .from("product_reviews")
         .select("*")
         .eq("product_id", productId)
         .eq("user_id", user!.id)
         .maybeSingle();
-      return data as ReviewRow | null;
+      return (data ?? null) as unknown as ReviewRow | null;
     },
   });
 
-  const avg = reviews && reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+  const avg =
+    reviews && reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
   const dist = reviews ? distribution(reviews) : [0, 0, 0, 0, 0, 0];
   const maxCount = Math.max(...dist.slice(1), 1);
 
@@ -77,22 +79,27 @@ export function ReviewsSection({ productId }: { productId: string }) {
       if (trimmed.length < 5) throw new Error("Review must be at least 5 characters");
       if (trimmed.length > 2000) throw new Error("Review is too long");
       // Verify product exists and is active (RLS already enforces is_active for public, but double-check)
-      const { data: prod } = await supabase.from("products").select("id").eq("id", productId).eq("is_active", true).maybeSingle();
+      const { data: prod } = await supabase
+        .from("products")
+        .select("id")
+        .eq("id", productId)
+        .eq("is_active", true)
+        .maybeSingle();
       if (!prod) throw new Error("Product not found");
 
       if (editingId || myReview) {
         const id = editingId ?? myReview!.id;
         const { error } = await supabase
-          .from("reviews")
-          .update({ rating, review_text: trimmed })
+          .from("product_reviews")
+          .update({ rating, comment: trimmed })
           .eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("reviews").insert({
+        const { error } = await supabase.from("product_reviews").insert({
           product_id: productId,
           user_id: user.id,
           rating,
-          review_text: trimmed,
+          comment: trimmed,
         });
         if (error) {
           if (error.code === "23505") throw new Error("You have already reviewed this product");
@@ -114,7 +121,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("reviews").delete().eq("id", id);
+      const { error } = await supabase.from("product_reviews").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -131,7 +138,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
   const startEdit = (r: ReviewRow) => {
     setEditingId(r.id);
     setRating(r.rating);
-    setText(r.review_text);
+    setText(r.comment ?? "");
     document.getElementById("review-form")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
@@ -153,7 +160,9 @@ export function ReviewsSection({ productId }: { productId: string }) {
                 <span className="font-display text-4xl">{avg.toFixed(1)}</span>
                 <StarRating value={Math.round(avg)} size="md" />
               </div>
-              <p className="mt-1 text-sm text-muted-foreground">{reviews.length} {reviews.length === 1 ? "review" : "reviews"}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {reviews.length} {reviews.length === 1 ? "review" : "reviews"}
+              </p>
             </div>
             <div className="space-y-1">
               {[5, 4, 3, 2, 1].map((n) => (
@@ -177,10 +186,16 @@ export function ReviewsSection({ productId }: { productId: string }) {
 
       {/* Form */}
       <div id="review-form" className="rounded-3xl bg-white p-6 ring-1 ring-border">
-        <h3 className="font-display text-lg uppercase mb-4">{editingId || myReview ? "Edit your review" : "Write a Review"}</h3>
+        <h3 className="font-display text-lg uppercase mb-4">
+          {editingId || myReview ? "Edit your review" : "Write a Review"}
+        </h3>
         {!user ? (
           <p className="text-sm text-muted-foreground">
-            Please <a href="/auth" className="text-brand underline">sign in</a> to write a review.
+            Please{" "}
+            <a href="/auth" className="text-brand underline">
+              sign in
+            </a>{" "}
+            to write a review.
           </p>
         ) : (
           <div className="space-y-4">
@@ -203,8 +218,16 @@ export function ReviewsSection({ productId }: { productId: string }) {
               <p className="mt-1 text-xs text-muted-foreground">{text.length}/2000</p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={() => submit.mutate()} disabled={submit.isPending} className="rounded-full">
-                {submit.isPending ? "Submitting…" : editingId || myReview ? "Update review" : "Submit review"}
+              <Button
+                onClick={() => submit.mutate()}
+                disabled={submit.isPending}
+                className="rounded-full"
+              >
+                {submit.isPending
+                  ? "Submitting…"
+                  : editingId || myReview
+                    ? "Update review"
+                    : "Submit review"}
               </Button>
               {(editingId || myReview) && (
                 <Button
@@ -212,7 +235,7 @@ export function ReviewsSection({ productId }: { productId: string }) {
                   onClick={() => {
                     setEditingId(null);
                     setRating(myReview?.rating ?? 0);
-                    setText(myReview?.review_text ?? "");
+                    setText(myReview?.comment ?? "");
                   }}
                 >
                   Cancel
@@ -220,7 +243,8 @@ export function ReviewsSection({ productId }: { productId: string }) {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Verified Purchase is determined automatically when we can confirm you purchased this product.
+              Verified Purchase is determined automatically when we can confirm you purchased this
+              product.
             </p>
           </div>
         )}
@@ -242,17 +266,28 @@ export function ReviewsSection({ productId }: { productId: string }) {
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">
-                      {r.profiles?.full_name ?? "Customer"} · {new Date(r.created_at).toLocaleDateString()}
+                      {r.profiles?.full_name ?? "Customer"} ·{" "}
+                      {new Date(r.created_at).toLocaleDateString()}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed break-words">{r.review_text}</p>
+                  <p className="mt-2 text-sm text-foreground/90 whitespace-pre-wrap">{r.comment}</p>
                 </div>
                 {isOwn && (
                   <div className="flex gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" onClick={() => startEdit(r)} aria-label="Edit">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => startEdit(r)}
+                      aria-label="Edit"
+                    >
                       <Pencil className="size-3" />
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => del.mutate(r.id)} aria-label="Delete">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => del.mutate(r.id)}
+                      aria-label="Delete"
+                    >
                       <Trash2 className="size-3" />
                     </Button>
                   </div>

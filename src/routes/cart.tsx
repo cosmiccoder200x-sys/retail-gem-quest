@@ -20,6 +20,19 @@ function CartPage() {
   const update = useUpdateCartQty();
   const remove = useRemoveFromCart();
 
+  const { data: shippingCfg } = useQuery({
+    queryKey: ["shipping-config-cart"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("shipping_config")
+        .select("base_shipping_charge, free_shipping_threshold")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      return data ?? { base_shipping_charge: 79, free_shipping_threshold: 999 };
+    },
+  });
+
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-12">
@@ -27,7 +40,10 @@ function CartPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex gap-4 rounded-2xl bg-white p-4 ring-1 ring-brand/5 animate-pulse">
+              <div
+                key={i}
+                className="flex gap-4 rounded-2xl bg-white p-4 ring-1 ring-brand/5 animate-pulse"
+              >
                 <div className="size-24 rounded-xl bg-secondary" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 bg-secondary rounded w-3/4" />
@@ -65,13 +81,6 @@ function CartPage() {
     const price = i.variant?.price ?? i.product.price;
     return n + price * i.quantity;
   }, 0);
-  const { data: shippingCfg } = useQuery({
-    queryKey: ["shipping-config-cart"],
-    queryFn: async () => {
-      const { data } = await supabase.from("shipping_config").select("base_shipping_charge, free_shipping_threshold").eq("is_active", true).limit(1).maybeSingle();
-      return data ?? { base_shipping_charge: 79, free_shipping_threshold: 999 };
-    },
-  });
   const shipping = (() => {
     if (subtotal === 0) return 0;
     const base = Number(shippingCfg?.base_shipping_charge ?? 79);
@@ -100,26 +109,40 @@ function CartPage() {
         <div className="space-y-3">
           {items.map((it) => (
             <div key={it.id} className="flex gap-4 rounded-2xl bg-white p-4 ring-1 ring-brand/5">
-              <Link to="/products/$slug" params={{ slug: it.product.slug }} className="size-24 shrink-0 overflow-hidden rounded-xl bg-background">
+              <Link
+                to="/products/$slug"
+                params={{ slug: it.product.slug }}
+                className="size-24 shrink-0 overflow-hidden rounded-xl bg-background"
+              >
                 <ProductTile name={it.product.name} imageUrl={it.product.image_url} />
               </Link>
               <div className="flex flex-1 flex-col">
-                <Link to="/products/$slug" params={{ slug: it.product.slug }} className="font-bold hover:text-accent-cyan">
+                <Link
+                  to="/products/$slug"
+                  params={{ slug: it.product.slug }}
+                  className="font-bold hover:text-accent-cyan"
+                >
                   {it.product.name}
                 </Link>
                 {it.variant?.attributes && (
                   <p className="text-xs text-muted-foreground">
-                    {Object.entries(it.variant.attributes as Record<string, { name?: string; value?: string }>)
+                    {Object.entries(
+                      it.variant.attributes as Record<string, { name?: string; value?: string }>,
+                    )
                       .filter(([, v]) => v?.value)
                       .map(([, v]) => v!.value)
                       .join(" · ")}
                   </p>
                 )}
-                <p className="text-sm text-muted-foreground">{formatINR(it.variant?.price ?? it.product.price)} each</p>
+                <p className="text-sm text-muted-foreground">
+                  {formatINR(it.variant?.price ?? it.product.price)} each
+                </p>
                 <div className="mt-auto flex items-center justify-between">
                   <div className="inline-flex items-center rounded-full bg-background ring-1 ring-border">
                     <button
-                      onClick={() => update.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1) })}
+                      onClick={() =>
+                        update.mutate({ id: it.id, quantity: Math.max(1, it.quantity - 1) })
+                      }
                       className="grid size-8 place-items-center"
                     >
                       <Minus className="size-3" />
@@ -133,7 +156,9 @@ function CartPage() {
                     </button>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-display text-lg italic">{formatINR((it.variant?.price ?? it.product.price) * it.quantity)}</span>
+                    <span className="font-display text-lg italic">
+                      {formatINR((it.variant?.price ?? it.product.price) * it.quantity)}
+                    </span>
                     <button
                       aria-label="Remove"
                       onClick={() => remove.mutate(it.id)}
@@ -150,12 +175,25 @@ function CartPage() {
         <aside className="space-y-4 rounded-3xl bg-white p-6 ring-1 ring-brand/5">
           <h3 className="font-display text-xl uppercase">Order Summary</h3>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between"><span>Subtotal</span><span>{formatINR(subtotal)}</span></div>
-            <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
-            <div className="flex justify-between font-display text-xl border-t border-border pt-2"><span>Total</span><span>{formatINR(total)}</span></div>
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span>{formatINR(subtotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span>{shipping === 0 ? "Free" : formatINR(shipping)}</span>
+            </div>
+            <div className="flex justify-between font-display text-xl border-t border-border pt-2">
+              <span>Total</span>
+              <span>{formatINR(total)}</span>
+            </div>
             <p className="text-xs text-muted-foreground">Coupon can be applied at checkout.</p>
           </div>
-          <Button asChild size="lg" className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan">
+          <Button
+            asChild
+            size="lg"
+            className="w-full rounded-full bg-brand font-bold uppercase tracking-tighter hover:bg-accent-cyan"
+          >
             <Link to="/checkout">Checkout</Link>
           </Button>
         </aside>

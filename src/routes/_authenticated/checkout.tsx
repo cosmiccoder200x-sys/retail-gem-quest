@@ -17,7 +17,7 @@ type PaymentMethod = "cod" | "online";
 
 declare global {
   interface Window {
-    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+    Razorpay: any;
   }
 }
 
@@ -47,16 +47,26 @@ interface RazorpayResponse {
 
 const schema = z.object({
   full_name: z.string().trim().min(2).max(80),
-  phone: z.string().trim().min(10).max(15).regex(/^[0-9]{10,15}$/, "Enter 10-15 digits"),
+  phone: z
+    .string()
+    .trim()
+    .min(10)
+    .max(15)
+    .regex(/^[0-9]{10,15}$/, "Enter 10-15 digits"),
   line1: z.string().trim().min(3).max(200),
   line2: z.string().trim().max(200).optional(),
   city: z.string().trim().min(2).max(80),
   state: z.string().trim().min(2).max(80),
-  pincode: z.string().trim().regex(/^[0-9]{6}$/, "6-digit pincode"),
+  pincode: z
+    .string()
+    .trim()
+    .regex(/^[0-9]{6}$/, "6-digit pincode"),
 });
 
 export const Route = createFileRoute("/_authenticated/checkout")({
-  head: () => ({ meta: [{ title: "Checkout — GullyGadget" }] }),
+  head: () => ({
+    meta: [{ title: "Checkout — GullyGadget" }, { name: "robots", content: "noindex, nofollow" }],
+  }),
   component: Checkout,
 });
 
@@ -85,7 +95,10 @@ function Checkout() {
     queryKey: ["addresses", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data } = await supabase.from("addresses").select("*").order("is_default", { ascending: false });
+      const { data } = await supabase
+        .from("addresses")
+        .select("*")
+        .order("is_default", { ascending: false });
       return data ?? [];
     },
   });
@@ -94,14 +107,21 @@ function Checkout() {
   const { data: shippingConfig } = useQuery({
     queryKey: ["shipping-config"],
     queryFn: async () => {
-      const { data } = await supabase.from("shipping_config").select("base_shipping_charge, free_shipping_threshold").eq("is_active", true).limit(1).maybeSingle();
+      const { data } = await supabase
+        .from("shipping_config")
+        .select("base_shipping_charge, free_shipping_threshold")
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
       return data ?? { base_shipping_charge: 79, free_shipping_threshold: 999 };
     },
   });
 
   // Coupon state (preview via validate_coupon RPC)
   const [couponInput, setCouponInput] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; discount: number } | null>(
+    null,
+  );
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponBusy, setCouponBusy] = useState(false);
 
@@ -121,29 +141,53 @@ function Checkout() {
 
   const applyCoupon = async () => {
     const code = couponInput.trim();
-    if (!code) { setCouponError("Enter a coupon code"); return; }
-    setCouponBusy(true); setCouponError(null);
+    if (!code) {
+      setCouponError("Enter a coupon code");
+      return;
+    }
+    setCouponBusy(true);
+    setCouponError(null);
     try {
-      const { data, error } = await supabase.rpc("validate_coupon", { p_code: code, p_user_id: user!.id, p_subtotal: subtotal } as any);
+      const { data, error } = await supabase.rpc("validate_coupon", {
+        p_code: code,
+        p_user_id: user!.id,
+        p_subtotal: subtotal,
+      } as any);
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data as any;
-      if (!row || row.error) { setCouponError(row?.error ?? "Invalid coupon"); setAppliedCoupon(null); }
-      else { setAppliedCoupon({ code: row.coupon_code ?? code.toUpperCase(), discount: Number(row.discount) }); setCouponError(null); toast.success(`Coupon ${row.coupon_code} applied`); }
-    } catch (e: any) { setCouponError(e.message ?? "Failed to validate coupon"); }
-    finally { setCouponBusy(false); }
+      const row = Array.isArray(data) ? data[0] : (data as any);
+      if (!row || row.error) {
+        setCouponError(row?.error ?? "Invalid coupon");
+        setAppliedCoupon(null);
+      } else {
+        setAppliedCoupon({
+          code: row.coupon_code ?? code.toUpperCase(),
+          discount: Number(row.discount),
+        });
+        setCouponError(null);
+        toast.success(`Coupon ${row.coupon_code} applied`);
+      }
+    } catch (e: any) {
+      setCouponError(e.message ?? "Failed to validate coupon");
+    } finally {
+      setCouponBusy(false);
+    }
   };
-  const removeCoupon = () => { setAppliedCoupon(null); setCouponInput(""); setCouponError(null); };
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError(null);
+  };
 
   const isEmptyCart = !items || items.length === 0;
-  const hasValidationErrors = validation?.some((v: { is_valid: boolean }) => !v.is_valid);
-  const validationError = validation?.find(
-    (v: { is_valid: boolean; error_message?: string }) => !v.is_valid
-  )?.error_message;
+  const hasValidationErrors = validation?.some((v) => !v.is_valid);
+  const validationError = validation?.find((v) => !v.is_valid)?.error_message;
 
   const openRazorpay = useCallback(
     async (orderId: string) => {
       // Load Razorpay script (dedup)
-      let script = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]') as HTMLScriptElement | null;
+      let script = document.querySelector(
+        'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+      ) as HTMLScriptElement | null;
       if (!script) {
         script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
@@ -155,9 +199,15 @@ function Checkout() {
       } else if (!(window as any).Razorpay) {
         await new Promise<void>((resolve) => {
           const check = setInterval(() => {
-            if ((window as any).Razorpay) { clearInterval(check); resolve(); }
+            if ((window as any).Razorpay) {
+              clearInterval(check);
+              resolve();
+            }
           }, 50);
-          setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+          setTimeout(() => {
+            clearInterval(check);
+            resolve();
+          }, 3000);
         });
       }
 
@@ -175,7 +225,7 @@ function Checkout() {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({ order_id: orderId }),
-        }
+        },
       );
 
       if (!res.ok) {
@@ -211,7 +261,7 @@ function Checkout() {
                   razorpay_signature: response.razorpay_signature,
                   order_id: orderId,
                 }),
-              }
+              },
             );
 
             if (!verifyRes.ok) {
@@ -227,7 +277,7 @@ function Checkout() {
             toast.error(
               err instanceof Error
                 ? `Payment verified but update failed: ${err.message}. Contact support.`
-                : "Payment completed but update failed. Contact support."
+                : "Payment completed but update failed. Contact support.",
             );
             // Still navigate to confirmation — webhook will handle final status
             navigate({ to: "/order-confirmation/$orderId", params: { orderId } });
@@ -256,7 +306,7 @@ function Checkout() {
       });
       rzp.open();
     },
-    [form.phone, user?.email, qc, navigate]
+    [form.phone, user?.email, qc, navigate],
   );
 
   const place = async (e: React.FormEvent) => {
@@ -324,7 +374,8 @@ function Checkout() {
 
       {hasValidationErrors && (
         <div className="mb-6 p-4 rounded-xl bg-destructive/10 text-destructive text-sm">
-          {validationError || "Some items in your cart are no longer available. Please review your cart."}
+          {validationError ||
+            "Some items in your cart are no longer available. Please review your cart."}
         </div>
       )}
 
@@ -366,16 +417,34 @@ function Checkout() {
                       className="mt-1"
                     />
                     <div className="text-sm">
-                      <p className="font-bold">{addr.full_name} {addr.is_default && <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full ml-1">Default</span>}</p>
-                      <p className="text-muted-foreground">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ""}</p>
-                      <p className="text-muted-foreground">{addr.city}, {addr.state} - {addr.pincode}</p>
+                      <p className="font-bold">
+                        {addr.full_name}{" "}
+                        {addr.is_default && (
+                          <span className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded-full ml-1">
+                            Default
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {addr.line1}
+                        {addr.line2 ? `, ${addr.line2}` : ""}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {addr.city}, {addr.state} - {addr.pincode}
+                      </p>
                       <p className="text-muted-foreground">Phone: {addr.phone}</p>
                     </div>
                   </label>
                 ))}
                 <div className="relative my-3">
-                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-                  <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-muted-foreground">or enter new address</span></div>
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="bg-white px-2 text-muted-foreground">
+                      or enter new address
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -479,9 +548,7 @@ function Checkout() {
                 <Banknote className="size-5 text-success" />
                 <div className="flex-1">
                   <p className="font-bold">Cash on Delivery</p>
-                  <p className="text-xs text-muted-foreground">
-                    Pay when your order arrives
-                  </p>
+                  <p className="text-xs text-muted-foreground">Pay when your order arrives</p>
                 </div>
               </label>
             </RadioGroup>
@@ -493,16 +560,44 @@ function Checkout() {
           <h3 className="font-display text-xl uppercase">Summary</h3>
           {/* Coupon */}
           <div className="rounded-2xl border border-border p-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Coupon</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+              Coupon
+            </p>
             {!appliedCoupon ? (
               <div className="flex gap-2">
-                <Input placeholder="Coupon code" value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} className="h-9 text-sm" />
-                <Button type="button" variant="outline" onClick={applyCoupon} disabled={couponBusy} className="h-9 rounded-full shrink-0">{couponBusy ? "..." : "Apply"}</Button>
+                <Input
+                  placeholder="Coupon code"
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  className="h-9 text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applyCoupon}
+                  disabled={couponBusy}
+                  className="h-9 rounded-full shrink-0"
+                >
+                  {couponBusy ? "..." : "Apply"}
+                </Button>
               </div>
             ) : (
               <div className="flex items-center justify-between rounded-xl bg-success/10 px-3 py-2">
-                <span className="text-sm font-bold">{appliedCoupon.code} <span className="font-normal text-success">- {formatINR(appliedCoupon.discount)}</span></span>
-                <Button type="button" variant="ghost" size="sm" onClick={removeCoupon} className="h-7 text-xs">Remove</Button>
+                <span className="text-sm font-bold">
+                  {appliedCoupon.code}{" "}
+                  <span className="font-normal text-success">
+                    - {formatINR(appliedCoupon.discount)}
+                  </span>
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={removeCoupon}
+                  className="h-7 text-xs"
+                >
+                  Remove
+                </Button>
               </div>
             )}
             {couponError && <p className="mt-2 text-xs text-destructive">{couponError}</p>}
@@ -541,7 +636,10 @@ function Checkout() {
               <span>Total</span>
               <span>{formatINR(total)}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">Final total is calculated securely on the server. Coupon and shipping are verified at checkout.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Final total is calculated securely on the server. Coupon and shipping are verified at
+              checkout.
+            </p>
           </div>
           <Button
             type="submit"
@@ -567,7 +665,21 @@ function Checkout() {
             </p>
           )}
           <p className="mt-3 text-center text-xs text-muted-foreground">
-            <a href="/shipping" className="underline hover:text-brand">Shipping</a> · <a href="/returns" className="underline hover:text-brand">Returns</a> · <a href="/privacy" className="underline hover:text-brand">Privacy</a> · <a href="/terms" className="underline hover:text-brand">Terms</a>
+            <a href="/shipping" className="underline hover:text-brand">
+              Shipping
+            </a>{" "}
+            ·{" "}
+            <a href="/returns" className="underline hover:text-brand">
+              Returns
+            </a>{" "}
+            ·{" "}
+            <a href="/privacy" className="underline hover:text-brand">
+              Privacy
+            </a>{" "}
+            ·{" "}
+            <a href="/terms" className="underline hover:text-brand">
+              Terms
+            </a>
           </p>
         </aside>
       </form>

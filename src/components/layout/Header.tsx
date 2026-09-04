@@ -88,11 +88,17 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
       <AnnouncementBar />
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-16">
-        <Link to="/" className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl shrink-0">
+        <Link
+          to="/"
+          className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl shrink-0"
+        >
           Gully<span className="text-brand">Gadget</span>
         </Link>
 
-        <nav className="ml-4 hidden gap-5 text-sm font-medium text-muted-foreground lg:flex" aria-label="Main navigation">
+        <nav
+          className="ml-4 hidden gap-5 text-sm font-medium text-muted-foreground lg:flex"
+          aria-label="Main navigation"
+        >
           {(categories ?? []).slice(0, 4).map((cat) => (
             <Link
               key={cat.slug}
@@ -103,7 +109,9 @@ export function Header() {
               {cat.name}
             </Link>
           ))}
-          <Link to="/products" className="font-semibold text-brand">₹999 Store</Link>
+          <Link to="/products" className="font-semibold text-brand">
+            ₹999 Store
+          </Link>
         </nav>
 
         <form onSubmit={submit} className="relative ml-auto hidden flex-1 max-w-xs md:block">
@@ -146,7 +154,12 @@ export function Header() {
                   className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-brand-soft"
                 >
                   {s.image_url ? (
-                    <img src={s.image_url} alt="" className="size-8 rounded-lg object-cover shrink-0" loading="lazy" />
+                    <img
+                      src={s.image_url}
+                      alt=""
+                      className="size-8 rounded-lg object-cover shrink-0"
+                      loading="lazy"
+                    />
                   ) : (
                     <div className="size-8 rounded-lg bg-secondary shrink-0" />
                   )}
@@ -203,7 +216,9 @@ export function Header() {
                     <Link to="/account">My Account</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link to="/account" hash="orders">My Orders</Link>
+                    <Link to="/account" hash="orders">
+                      My Orders
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/account" hash="wishlist">
