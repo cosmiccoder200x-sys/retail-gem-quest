@@ -9,6 +9,9 @@ function getCorsHeaders(req: Request) {
     origin === allowedEnv ||
     origin === "https://gullygadget.com" ||
     origin.endsWith(".gullygadget.com") ||
+    // Vercel production & preview deployments
+    origin === "https://retail-gem-quest.vercel.app" ||
+    origin.endsWith(".vercel.app") ||
     origin.startsWith("http://localhost:") ||
     origin.startsWith("http://127.0.0.1:") ||
     origin.includes("lovableproject.com");

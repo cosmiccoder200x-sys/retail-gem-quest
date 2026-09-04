@@ -1,11 +1,24 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") || "https://gullygadget.com",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+function getWebhookCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedEnv = Deno.env.get("ALLOWED_ORIGIN") || "https://gullygadget.com";
+  const isAllowed =
+    origin === allowedEnv ||
+    origin === "https://gullygadget.com" ||
+    origin.endsWith(".gullygadget.com") ||
+    origin === "https://retail-gem-quest.vercel.app" ||
+    origin.endsWith(".vercel.app") ||
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:");
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedEnv,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-razorpay-signature",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
 
 // Verify Razorpay webhook signature
 async function verifyWebhookSignature(
@@ -33,6 +46,7 @@ async function verifyWebhookSignature(
 }
 
 serve(async (req: Request) => {
+  const corsHeaders = getWebhookCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
